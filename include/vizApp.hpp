@@ -5,7 +5,8 @@
 #include <cinder/MayaCamUI.h>
 #include "camera.hpp"
 #include <utils/handler.hpp>
-#include <pose_grabber.hpp>
+#include "pose_grabber.hpp"
+#include "trackable.hpp"
 
 using namespace ci;
 using namespace ci::app;
@@ -36,7 +37,7 @@ namespace viz {
     boost::scoped_ptr<ttrk::Handler> handler_;
 
     boost::scoped_ptr<BasePoseGrabber> camera_pose_;
-    std::vector< boost::scoped_ptr<BasePoseGrabber> > moving_objects_;
+    std::vector< boost::scoped_ptr<Trackable> > moving_objects_;
 
   };
 

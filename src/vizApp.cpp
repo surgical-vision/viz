@@ -7,12 +7,30 @@ const int WINDOW_HEIGHT = 288;
 
 void vizApp::setup(){
 
-  const std::string input_video("f.avi");
-  const std::string output_video("g.avi");
+  const std::string root_dir("../config");
+  if (!boost::filesystem::is_directory(root_dir))
+    throw std::runtime_error("Error, cannot file config dir!");
+
+  const std::string input_video(root_dir + "/" + "f.avi");
+  const std::string output_video(root_dir + "/" + "g.avi");
+  const std::string camera_suj_file(root_dir + "/" +"cam_suj.txt");
+  const std::string camera_j_file(root_dir + "/" +"cam_j.txt");
+  const std::string left_dv_suj_file(root_dir + "/" +"left_dv_suj.txt");
+  const std::string left_dv_j_file(root_dir + "/" +"left_dv_j.txt");
+  const std::string right_dv_suj_file(root_dir + "/" +"right_dv_suj.txt");
+  const std::string right_dv_j_file(root_dir + "/" +"right_dv_j.txt");
+  const std::string da_vinci_config_file(root_dir + "/" +"da_vinci_config.json");
 
   handler_.reset(new ttrk::VideoHandler(input_video,output_video));
+  camera_pose_.reset(new DaVinciPoseGrabber(camera_suj_file, camera_j_file));
+  moving_objects_.push_back(boost::scoped_ptr<Trackable>(new Trackable()));
+  moving_objects_.back()->setupDaVinciPoseGrabber(left_dv_suj_file, left_dv_j_file, da_vinci_config_file);
+  moving_objects_.push_back(boost::scoped_ptr<Trackable>(new Trackable()));
+  moving_objects_.back()->setupDaVinciPoseGrabber(right_dv_suj_file, right_dv_j_file, da_vinci_config_file);
 
   setWindowSize(2 * WINDOW_WIDTH, WINDOW_HEIGHT);
+
+
 
 }
 
