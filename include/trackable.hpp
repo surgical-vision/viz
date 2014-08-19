@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 #include <boost/scoped_ptr.hpp>
 #include <track/model/articulated_model.hpp>

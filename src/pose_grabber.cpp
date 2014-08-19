@@ -20,6 +20,8 @@ void BasePoseGrabber::convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::M
   ci::Quatf q(in_gl_coords);
   out_pose.rotate(q.getAxis(), q.getAngle());
 
+  out_pose.invert(); //bouguet poses (from calibration) are grid poses so invert to get camera poses
+
 }
 
 PoseGrabber::PoseGrabber(const std::string &filename){
@@ -69,6 +71,15 @@ Pose PoseGrabber::getNextPose(){
     next_pose.setToIdentity();
   }
 
-  return next_pose;
+  ci::Matrix44f gl_next_pose;
+  convertFromBouguetPose(next_pose, gl_next_pose);
+
+  return gl_next_pose;
+
+}
+
+Pose DaVinciPoseGrabber::getNextPose(){
+
+  throw std::runtime_error("not implemented");
 
 }

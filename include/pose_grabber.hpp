@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cinder/Matrix.h>
 #include <fstream>
 #include <vector>
@@ -19,7 +21,7 @@ namespace viz {
   public:
     
     virtual Pose getNextPose() = 0;
-    virtual ~BasePoseGrabber();
+    virtual ~BasePoseGrabber() {};
 
   protected:
 
@@ -28,7 +30,7 @@ namespace viz {
   };
 
 
-  class PoseGrabber : BasePoseGrabber {
+  class PoseGrabber : public BasePoseGrabber {
 
   public:
     

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <opencv2/opencv.hpp>
 #include <string>
 #include <cinder/gl/gl.h>
@@ -48,8 +50,14 @@ namespace viz {
     void setupCameras();
     void unsetCameras();
 
+    void convertBouguetToGLCoordinates_3d(cv::Mat &rotation, cv::Mat &translation);
+
+    ci::Vec3f getExtrinsicTranslation() const { return extrinsic_translation_; }
+    ci::Matrix33f getExtrinsicRotation() const { return extrinsic_rotation_; }
+
   protected:
 
+    
     void convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv::Mat &right_camera_matrix, cv::Mat &extrinsic_rotation, cv::Mat &extrinsic_translation, const int image_width, const int image_height);
 
     Camera left_eye_;

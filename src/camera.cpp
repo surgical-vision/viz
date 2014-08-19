@@ -1,4 +1,5 @@
 #include "../include/camera.hpp"
+#include <cinder/gl/gl.h>
 
 using namespace viz;
 
@@ -15,12 +16,12 @@ void Camera::Setup(const cv::Mat camera_matrix, const cv::Mat distortion_params,
 
   //setup openGL projection matrix
   gl_projection_matrix_.setToNull();
-  gl_projection_matrix_.m00 = camera_matrix_.at<float>(0, 0);
-  gl_projection_matrix_.m11 = camera_matrix_.at<float>(1, 1);
-  gl_projection_matrix_.m02 = -camera_matrix_.at<float>(0, 2);
-  gl_projection_matrix_.m12 = -camera_matrix_.at<float>(1, 2);
-  gl_projection_matrix_.m22 = near_clip_distance + far_clip_distance;
-  gl_projection_matrix_.m23 = near_clip_distance * far_clip_distance;
+  gl_projection_matrix_.m00 = (float)camera_matrix_.at<double>(0, 0);
+  gl_projection_matrix_.m11 = (float)camera_matrix_.at<double>(1, 1);
+  gl_projection_matrix_.m02 = (float)-camera_matrix_.at<double>(0, 2);
+  gl_projection_matrix_.m12 = (float)-camera_matrix_.at<double>(1, 2);
+  gl_projection_matrix_.m22 = (float)(near_clip_distance + far_clip_distance);
+  gl_projection_matrix_.m23 = (float)(near_clip_distance * far_clip_distance);
   gl_projection_matrix_.m32 = -1;
 
   is_setup_ = true;
@@ -58,14 +59,16 @@ void StereoCamera::Setup(const std::string &calibration_filename, const int imag
     fs["Extrinsic_Camera_Rotation"] >> rotation;
     fs["Extrinsic_Camera_Translation"] >> translation;
 
+    convertBouguetToGLCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
+
     left_eye_.Setup(l_intrinsic, l_distortion, image_width, image_height, near_clip_distance, far_clip_distance);
     right_eye_.Setup(r_intrinsic, r_distortion, image_width, image_height, near_clip_distance, far_clip_distance);
 
     for (int r = 0; r<rotation.rows; r++){
       for (int c = 0; c<rotation.cols; c++){
-        extrinsic_rotation_.at(r,c) = rotation.at<double>(r, c);
+        extrinsic_rotation_.at(r,c) = (float)rotation.at<double>(r, c);
       }
-      extrinsic_translation_[r] = translation.at<double>(r, 0);
+      extrinsic_translation_[r] = (float)translation.at<double>(r, 0);
     }
 
   }
@@ -82,7 +85,7 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
 
   //first flip the principal points
   left_camera_matrix.at<double>(1, 2) = image_height - left_camera_matrix.at<double>(1, 2);
-  left_camera_matrix.at<double>(1, 2) = image_height - left_camera_matrix.at<double>(1, 2);
+  right_camera_matrix.at<double>(1, 2) = image_height - right_camera_matrix.at<double>(1, 2);
 
   //set the rotation matrix
   cv::Mat inv_rotation = extrinsic_rotation.inv();
@@ -91,11 +94,12 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
   cv::Mat in_gl_coords = flip * inv_rotation * flip;
   extrinsic_rotation = in_gl_coords.clone();
 
-  //set the translation matrix by flipping x and z
+  //set the translation matrix by flipping x ( basically flip everything (we use inv transforms) then flip y and z so just flip x to get same result)
   extrinsic_translation.at<double>(0, 0) *= -1;
-  extrinsic_translation.at<double>(2, 0) *= -1;
   
 }
+
+
 
 
 void StereoCamera::setupCameras(){
@@ -128,32 +132,52 @@ void StereoCamera::makeRightEyeCurrent(){
 void StereoCamera::moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose){
 
   ci::CameraPersp camP;
-  ci::Quatf rotation(current_camera_pose.subMatrix33(0, 0));
 
-  ci::Vec3f eye_point = current_camera_pose.getTranslate().xyz();
-  ci::Vec3f view_direction = rotation * ci::Vec3f(0, 0, -1);
-  ci::Vec3f world_up = rotation * ci::Vec3f(0, 1, 0);
+  ci::Quatf cam_rotation(current_camera_pose.subMatrix33(0, 0));
+  ci::Vec3f cam_translation = current_camera_pose.getTranslate().xyz();
+
+  ci::Vec3f eye_point = cam_translation;
+  ci::Vec3f view_direction = cam_rotation * ci::Vec3f(0, 0, -1);
+  ci::Vec3f world_up = cam_rotation * ci::Vec3f(0, 1, 0);
 
   camP.setEyePoint(eye_point);
   camP.setViewDirection(view_direction);
   camP.setWorldUp(world_up);
   cam.setCurrentCam(camP);
 
+  ci::gl::setMatrices(cam.getCamera());
+
 }
 
 void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose){
 
   ci::CameraPersp camP;
-  ci::Quatf rotation(current_camera_pose.subMatrix33(0, 0));
-  ci::Quatf extrinsic_rotation(extrinsic_rotation_);
 
-  ci::Vec3f eye_point = current_camera_pose.getTranslate().xyz();
-  ci::Vec3f view_direction = rotation * ci::Vec3f(0, 0, -1);
-  ci::Vec3f world_up = rotation * ci::Vec3f(0, 1, 0);
+  //ci::Quatf cam_rotation(current_camera_pose.subMatrix33(0, 0));
+  //ci::Vec3f cam_translation = current_camera_pose.getTranslate().xyz();
 
-  camP.setEyePoint(eye_point + (rotation*extrinsic_translation_));
-  camP.setViewDirection(ci::Quatf(extrinsic_rotation_) * view_direction);
-  camP.setWorldUp(ci::Quatf(extrinsic_rotation_) * world_up);
+  //ci::Vec3f eye_point = cam_translation + extrinsic_translation_;
+
+  //ci::Vec3f view_direction = cam_rotation * (extrinsic_rotation_*ci::Vec3f(0, 0, -1));
+  //ci::Vec3f world_up = cam_rotation * (extrinsic_rotation_*ci::Vec3f(0, 1, 0));
+  ////ci::Vec3f view_direction = extrinsic_rotation_*(cam_rotation*ci::Vec3f(0, 0, -1));
+  ////ci::Vec3f world_up = extrinsic_rotation_ * (cam_rotation*ci::Vec3f(0, 1, 0));
+
+  //camP.setEyePoint(eye_point);
+  //camP.setViewDirection(view_direction);
+  //camP.setWorldUp(world_up);
+  
+  camP.setEyePoint(extrinsic_translation_);
+  ci::Vec3f view_direction(0, 0, -1);
+  ci::Vec3f world_up(0, 1, 0);
+  view_direction = extrinsic_rotation_ * view_direction;
+  world_up = extrinsic_rotation_ * world_up;
+  camP.setViewDirection(view_direction);
+  camP.setWorldUp(world_up);
   cam.setCurrentCam(camP);
+
+  ci::gl::setMatrices(cam.getCamera());
+
+  ci::gl::multModelView(current_camera_pose.inverted());
 
 }
