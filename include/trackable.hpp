@@ -13,7 +13,7 @@ namespace viz {
   public:
 
     void setupPoseGrabber(const std::string &filename);
-    void setupDaVinciPoseGrabber(const std::string &suj_file, const std::string &j_file, const std::string &da_vinci_config);
+    void setupDaVinciPoseGrabber(const std::string &suj_file, const std::string &j_file, const std::string &da_vinci_config, davinci::DaVinciJoint joint_type);
 
   protected:
 

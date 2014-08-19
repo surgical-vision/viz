@@ -1,5 +1,7 @@
 #include "../include/pose_grabber.hpp"
 #include <cinder/Quaternion.h>
+#include "api_stream.h"
+#include "snippets.hpp"
 
 using namespace viz;
 
@@ -35,7 +37,24 @@ PoseGrabber::PoseGrabber(const std::string &filename){
 
 }
 
-DaVinciPoseGrabber::DaVinciPoseGrabber(const std::string &in_suj_file, const std::string &in_j_file){
+DaVinciPoseGrabber::DaVinciPoseGrabber(const std::string &in_suj_file, const std::string &in_j_file, const davinci::DaVinciJoint joint_type){
+
+  switch (joint_type){
+
+  case davinci::DaVinciJoint::PSM1:
+    num_suj_joints_ = chain_.mSUJ1TipPSM1Origin.size();
+    num_j_joints_ = chain_.mPSM1OriginPSM1Tip.size();
+    break;
+  case davinci::DaVinciJoint::PSM2:
+    num_suj_joints_ = chain_.mSUJ2TipPSM2Origin.size();
+    num_j_joints_ = chain_.mPSM2OriginPSM2Tip.size();
+    break;
+  case davinci::DaVinciJoint::ECM:
+    num_suj_joints_ = chain_.mSUJ3OriginSUJ3Tip.size();
+    num_j_joints_ = chain_.mECM1OriginECM1Tip.size();
+    break;
+
+  }
 
   suj_ifs_.open(in_suj_file);
   if (!suj_ifs_.is_open()){
@@ -80,6 +99,70 @@ Pose PoseGrabber::getNextPose(){
 
 Pose DaVinciPoseGrabber::getNextPose(){
 
-  throw std::runtime_error("not implemented");
+  std::vector<double> suj_joints, j_joints;
+  ReadDHFromFiles(suj_joints, j_joints);
+
+  chain_.UpdateChain(suj_joints, j_joints, target_joint_);
+
+  Pose suj_frames, j_frames;
+
+  if (target_joint_ == davinci::ECM){
+    API_ECM ecm;
+
+    for (std::size_t i = 0; i < suj_joints.size(); ++i){
+      ecm.sj_joint_angles[i] = suj_joints[i];
+    }
+
+    for (std::size_t i = 0; i < j_joints.size(); ++i){
+      ecm.jnt_pos[i] = j_joints[i];
+    }
+
+    GLdouble ecm_transform[16];
+    buildKinematicChainECM1(chain_, ecm, ecm_transform, suj_frames, j_frames);
+
+  }
+
+  else if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
+    
+    API_PSM psm;
+
+    for (std::size_t i = 0; i < suj_joints.size(); ++i){
+      psm.sj_joint_angles[i] = suj_joints[i];
+    }
+
+    for (std::size_t i = 0; i < j_joints.size(); ++i){
+      psm.jnt_pos[i] = j_joints[i];
+    }
+
+    GLdouble psm_transform[16];
+    if (target_joint_ == davinci::PSM1)
+      buildKinematicChainPSM1(chain_, psm, psm_transform, suj_frames, j_frames);
+    else if (target_joint_ == davinci::PSM2)
+      buildKinematicChainPSM2(chain_, psm, psm_transform, suj_frames, j_frames);
+  }
+
+  return j_frames;
+
+}
+
+void DaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_suj_joints, std::vector<double> &psm_joints){
+
+  try{
+    for (int i = 0; i < num_j_joints_; ++i){
+      double x;
+      j_ifs_ >> x;
+      psm_joints.push_back(x);
+    }
+
+    for (int i = 0; i < num_suj_joints_; ++i){
+      double x;
+      suj_ifs_ >> x;
+      psm_suj_joints.push_back(x);
+    }
+
+  }
+  catch (std::ifstream::failure){
+    exit(0);
+  }
 
 }

@@ -115,14 +115,18 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\camera.cpp" />
+    <ClCompile Include="..\src\davinci.cpp" />
     <ClCompile Include="..\src\pose_grabber.cpp" />
+    <ClCompile Include="..\src\snippets.cpp" />
     <ClCompile Include="..\src\trackable.cpp" />
     <ClCompile Include="..\src\vizApp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\camera.hpp" />
+    <ClInclude Include="..\include\davinci.hpp" />
     <ClInclude Include="..\include\pose_grabber.hpp" />
     <ClInclude Include="..\include\Resources.h" />
+    <ClInclude Include="..\include\snippets.hpp" />
     <ClInclude Include="..\include\trackable.hpp" />
     <ClInclude Include="..\include\vizApp.hpp" />
   </ItemGroup>

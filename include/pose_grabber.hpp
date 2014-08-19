@@ -3,12 +3,14 @@
 #include <cinder/Matrix.h>
 #include <fstream>
 #include <vector>
+#include "davinci.hpp"
 
 namespace viz {
 
 
   struct Pose {
   
+    Pose() {}
     Pose(ci::Matrix44f &val) { poses_.push_back(val); }
 
     std::vector<ci::Matrix44f> poses_;  
@@ -42,20 +44,29 @@ namespace viz {
 
   };
 
+  
 
 
   class DaVinciPoseGrabber : public BasePoseGrabber {
 
   public:
 
-    DaVinciPoseGrabber(const std::string &in_suj_file, const std::string &in_j_file);
+    DaVinciPoseGrabber(const std::string &in_suj_file, const std::string &in_j_file, const davinci::DaVinciJoint joint_type);
     virtual Pose getNextPose();
 
   protected:
 
+    void ReadDHFromFiles(std::vector<double> &psm_suj_joints, std::vector<double> &psm_joints);
+
     std::ifstream suj_ifs_;
     std::ifstream j_ifs_;
-  
+    
+    std::size_t num_suj_joints_;
+    std::size_t num_j_joints_;
+
+    davinci::DaVinciKinematicChain chain_;
+    davinci::DaVinciJoint target_joint_;
+
   };
 
 
