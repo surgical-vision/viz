@@ -6,6 +6,7 @@ float PI = 3.14159265358979323846f;
 float PI_2 = 1.57079632679489661923f;
 float PI_4 = 0.785398163397448309616f;
 
+/*
 void DaVinciKinematicChain::UpdateChain(std::vector<double> &suj_joints, std::vector<double> &j_joints, DaVinciJoint joint_type){
 
   if (joint_type == PSM1){
@@ -79,9 +80,16 @@ void DaVinciKinematicChain::UpdateChain(std::vector<double> &suj_joints, std::ve
   }
 
 }
+*/
 
-void DaVinciKinematicChain::SetupPSM1(){
+DaVinciKinematicChain::DaVinciKinematicChain(void){
   
+  // Standard angles
+  float PI = 3.14159265358979323846f;
+  float PI_2 = 1.57079632679489661923f;
+  float PI_4 = 0.785398163397448309616f;
+
+  // General transformation from world origin to SUJ1 origin (assumes alpha cart)
   mWorldOriginSUJ1Origin.push_back(GeneralFrame(-0.1016f, -0.1016f, 0.43f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
   // Denavit-Hartenberg parameters from SUJ1 origin to SUJ1 tip (assumes alpha cart)
@@ -108,10 +116,9 @@ void DaVinciKinematicChain::SetupPSM1(){
   mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(6, JointTypeEnum::ROTARY, PSM1_PitchToYaw, -PI_2, 0.0f, -PI_2));
   mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(7, JointTypeEnum::FIXED, 0.0f, -PI_2, PSM1_YawToCtrlPnt, 0.0f));
 
+  // General transformation from world origin to SUJ2 origin (assumes alpha cart)
+  mWorldOriginSUJ2Origin.push_back(GeneralFrame(0.1016f, -0.1016f, 0.43f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
-}
-
-void DaVinciKinematicChain::SetupPSM2(){
   // Denavit-Hartenberg parameters from SUJ2 origin to SUJ2 tip (assumes alpha cart)
   mSUJ2OriginSUJ2Tip.push_back(DenavitHartenbergFrame(1, JointTypeEnum::PRISMATIC, 0.08979f, 0.0f, 0.0f, 0.0f));
   mSUJ2OriginSUJ2Tip.push_back(DenavitHartenbergFrame(2, JointTypeEnum::ROTARY, 0.0f, 0.0f, 0.4166f, 0.0f));
@@ -136,9 +143,6 @@ void DaVinciKinematicChain::SetupPSM2(){
   mPSM2OriginPSM2Tip.push_back(DenavitHartenbergFrame(6, JointTypeEnum::ROTARY, PSM2_PitchToYaw, -PI_2, 0.0f, -PI_2));
   mPSM2OriginPSM2Tip.push_back(DenavitHartenbergFrame(7, JointTypeEnum::FIXED, 0.0f, -PI_2, PSM2_YawToCtrlPnt, 0.0f));
 
-}
-
-void DaVinciKinematicChain::SetupECM(){
   // Denavit-Hartenberg parameters from world origin to SUJ3 origin (assumes alpha cart)
   mWorldOriginSUJ3Origin.push_back(GeneralFrame(0.0f, 0.0f, 0.43f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
@@ -163,14 +167,5 @@ void DaVinciKinematicChain::SetupECM(){
   mECM1OriginECM1Tip.push_back(DenavitHartenbergFrame(5, JointTypeEnum::FIXED, 0.0f, -PI_2, 0.0f, -PI_2));
   mECM1OriginECM1Tip.push_back(DenavitHartenbergFrame(6, JointTypeEnum::FIXED, 0.0f, -PI_2, 0.0f, -PI_2));
   mECM1OriginECM1Tip.push_back(DenavitHartenbergFrame(7, JointTypeEnum::FIXED, 0.0f, -PI_2, 0.0f, 0.0f));
-}
-
-DaVinciKinematicChain::DaVinciKinematicChain(void){
-  
-  SetupPSM1();
-  SetupPSM2();
-  SetupECM();
   
 }
-
-/******************************************************************************************************************************/

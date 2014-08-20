@@ -1,5 +1,6 @@
 #include "../include/pose_grabber.hpp"
 #include <cinder/Quaternion.h>
+#include <cinder/app/App.h>
 #include "api_stream.h"
 #include "snippets.hpp"
 
@@ -39,19 +40,21 @@ PoseGrabber::PoseGrabber(const std::string &filename){
 
 DaVinciPoseGrabber::DaVinciPoseGrabber(const std::string &in_suj_file, const std::string &in_j_file, const davinci::DaVinciJoint joint_type){
 
-  switch (joint_type){
+  target_joint_ = joint_type;
+
+  switch (target_joint_){
 
   case davinci::DaVinciJoint::PSM1:
-    num_suj_joints_ = chain_.mSUJ1TipPSM1Origin.size();
+    num_suj_joints_ = chain_.mSUJ1OriginSUJ1Tip.size();
     num_j_joints_ = chain_.mPSM1OriginPSM1Tip.size();
     break;
   case davinci::DaVinciJoint::PSM2:
-    num_suj_joints_ = chain_.mSUJ2TipPSM2Origin.size();
+    num_suj_joints_ = chain_.mSUJ2OriginSUJ2Tip.size();
     num_j_joints_ = chain_.mPSM2OriginPSM2Tip.size();
     break;
   case davinci::DaVinciJoint::ECM:
     num_suj_joints_ = chain_.mSUJ3OriginSUJ3Tip.size();
-    num_j_joints_ = chain_.mECM1OriginECM1Tip.size();
+    num_j_joints_ = 4;//chain_.mECM1OriginECM1Tip.size(); //alhtough this value is 4 in the file in pratt's code it is 7
     break;
 
   }
@@ -102,7 +105,7 @@ Pose DaVinciPoseGrabber::getNextPose(){
   std::vector<double> suj_joints, j_joints;
   ReadDHFromFiles(suj_joints, j_joints);
 
-  chain_.UpdateChain(suj_joints, j_joints, target_joint_);
+  //chain_.UpdateChain(suj_joints, j_joints, target_joint_);
 
   Pose suj_frames, j_frames;
 
@@ -119,6 +122,12 @@ Pose DaVinciPoseGrabber::getNextPose(){
 
     GLdouble ecm_transform[16];
     buildKinematicChainECM1(chain_, ecm, ecm_transform, suj_frames, j_frames);
+
+    ci::Matrix44f tmp;
+    //convertFromDaVinciPose(j_frames.poses_[0], tmp);
+    //j_frames.poses_[0] = tmp;
+
+    //convertFromDaVinciPose(t, j_frames.poses_[0]);
 
   }
 
@@ -141,7 +150,42 @@ Pose DaVinciPoseGrabber::getNextPose(){
       buildKinematicChainPSM2(chain_, psm, psm_transform, suj_frames, j_frames);
   }
 
+  //translate then rotate gives the same results
+
   return j_frames;
+
+}
+
+void DaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
+
+  out_pose.setToIdentity();
+  
+  ci::Matrix33f flip;
+  flip.setToIdentity();
+  flip.at(0, 0) *= -1;
+  flip.at(2, 2) *= -1;
+  ci::Quatf q(flip);
+  out_pose.rotate(q.getAxis(), q.getAngle());
+
+  ci::Vec3f translation = in_pose.getTranslate().xyz();
+  out_pose.translate(translation);
+  
+  ci::Matrix33f in_gl_coords = in_pose.subMatrix33(0, 0);
+  ci::Quatf q2(in_gl_coords);
+  out_pose.rotate(q2.getAxis(), q2.getAngle());
+
+  //ci::Vec3f translation = in_pose.getTranslate().xyz();
+  //translation[0] *= -1;
+  //translation[2] *= -1;
+  //out_pose.translate(translation);
+
+  //ci::Matrix33f flip;
+  //flip.setToIdentity();
+  //flip.at(0, 0) *= -1;
+  //flip.at(2, 2) *= -1;
+  //ci::Matrix33f in_gl_coords = flip * in_pose.subMatrix33(0, 0);
+  //ci::Quatf q(in_gl_coords);
+  //out_pose.rotate(q.getAxis(), q.getAngle());
 
 }
 

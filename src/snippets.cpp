@@ -21,138 +21,6 @@
 
 const double SCALE = 100; //1000.0
 
-bool gluInvertMatrix(const double m[16], double invOut[16])
-{
-  double inv[16], det;
-  int i;
-
-  inv[0] = m[5] * m[10] * m[15] -
-    m[5] * m[11] * m[14] -
-    m[9] * m[6] * m[15] +
-    m[9] * m[7] * m[14] +
-    m[13] * m[6] * m[11] -
-    m[13] * m[7] * m[10];
-
-  inv[4] = -m[4] * m[10] * m[15] +
-    m[4] * m[11] * m[14] +
-    m[8] * m[6] * m[15] -
-    m[8] * m[7] * m[14] -
-    m[12] * m[6] * m[11] +
-    m[12] * m[7] * m[10];
-
-  inv[8] = m[4] * m[9] * m[15] -
-    m[4] * m[11] * m[13] -
-    m[8] * m[5] * m[15] +
-    m[8] * m[7] * m[13] +
-    m[12] * m[5] * m[11] -
-    m[12] * m[7] * m[9];
-
-  inv[12] = -m[4] * m[9] * m[14] +
-    m[4] * m[10] * m[13] +
-    m[8] * m[5] * m[14] -
-    m[8] * m[6] * m[13] -
-    m[12] * m[5] * m[10] +
-    m[12] * m[6] * m[9];
-
-  inv[1] = -m[1] * m[10] * m[15] +
-    m[1] * m[11] * m[14] +
-    m[9] * m[2] * m[15] -
-    m[9] * m[3] * m[14] -
-    m[13] * m[2] * m[11] +
-    m[13] * m[3] * m[10];
-
-  inv[5] = m[0] * m[10] * m[15] -
-    m[0] * m[11] * m[14] -
-    m[8] * m[2] * m[15] +
-    m[8] * m[3] * m[14] +
-    m[12] * m[2] * m[11] -
-    m[12] * m[3] * m[10];
-
-  inv[9] = -m[0] * m[9] * m[15] +
-    m[0] * m[11] * m[13] +
-    m[8] * m[1] * m[15] -
-    m[8] * m[3] * m[13] -
-    m[12] * m[1] * m[11] +
-    m[12] * m[3] * m[9];
-
-  inv[13] = m[0] * m[9] * m[14] -
-    m[0] * m[10] * m[13] -
-    m[8] * m[1] * m[14] +
-    m[8] * m[2] * m[13] +
-    m[12] * m[1] * m[10] -
-    m[12] * m[2] * m[9];
-
-  inv[2] = m[1] * m[6] * m[15] -
-    m[1] * m[7] * m[14] -
-    m[5] * m[2] * m[15] +
-    m[5] * m[3] * m[14] +
-    m[13] * m[2] * m[7] -
-    m[13] * m[3] * m[6];
-
-  inv[6] = -m[0] * m[6] * m[15] +
-    m[0] * m[7] * m[14] +
-    m[4] * m[2] * m[15] -
-    m[4] * m[3] * m[14] -
-    m[12] * m[2] * m[7] +
-    m[12] * m[3] * m[6];
-
-  inv[10] = m[0] * m[5] * m[15] -
-    m[0] * m[7] * m[13] -
-    m[4] * m[1] * m[15] +
-    m[4] * m[3] * m[13] +
-    m[12] * m[1] * m[7] -
-    m[12] * m[3] * m[5];
-
-  inv[14] = -m[0] * m[5] * m[14] +
-    m[0] * m[6] * m[13] +
-    m[4] * m[1] * m[14] -
-    m[4] * m[2] * m[13] -
-    m[12] * m[1] * m[6] +
-    m[12] * m[2] * m[5];
-
-  inv[3] = -m[1] * m[6] * m[11] +
-    m[1] * m[7] * m[10] +
-    m[5] * m[2] * m[11] -
-    m[5] * m[3] * m[10] -
-    m[9] * m[2] * m[7] +
-    m[9] * m[3] * m[6];
-
-  inv[7] = m[0] * m[6] * m[11] -
-    m[0] * m[7] * m[10] -
-    m[4] * m[2] * m[11] +
-    m[4] * m[3] * m[10] +
-    m[8] * m[2] * m[7] -
-    m[8] * m[3] * m[6];
-
-  inv[11] = -m[0] * m[5] * m[11] +
-    m[0] * m[7] * m[9] +
-    m[4] * m[1] * m[11] -
-    m[4] * m[3] * m[9] -
-    m[8] * m[1] * m[7] +
-    m[8] * m[3] * m[5];
-
-  inv[15] = m[0] * m[5] * m[10] -
-    m[0] * m[6] * m[9] -
-    m[4] * m[1] * m[10] +
-    m[4] * m[2] * m[9] +
-    m[8] * m[1] * m[6] -
-    m[8] * m[2] * m[5];
-
-  det = m[0] * inv[0] + m[1] * inv[4] + m[2] * inv[8] + m[3] * inv[12];
-
-  if (det == 0)
-    return false;
-
-  det = 1.0 / det;
-
-  for (i = 0; i < 16; i++)
-    invOut[i] = inv[i] * det;
-
-  return true;
-}
-
-/******************************************************************************************************************************/
-
 // Set identity matrix
 void glhSetIdentity(GLdouble* A)
 {
@@ -219,7 +87,7 @@ void extendChain(const GeneralFrame& frame, GLdouble* A)
 /******************************************************************************************************************************/
 
 // Create Denavit-Hartenberg transformation 
-void glhDenavitHartenbergPP(GLdouble a, GLdouble alpha, GLdouble d, GLdouble theta, GLdouble* A) {
+void glhDenavitHartenberg(GLdouble a, GLdouble alpha, GLdouble d, GLdouble theta, GLdouble* A) {
   
   GLdouble sa = sin(alpha);
   GLdouble ca = cos(alpha);
@@ -245,82 +113,6 @@ void glhDenavitHartenbergPP(GLdouble a, GLdouble alpha, GLdouble d, GLdouble the
 
 }
 
-
-void glhDenavitHartenberg(const double a, const double alpha, const double d, const double theta, GLdouble *A){
-  
-  GLdouble x[16], z[16];
-
-  x[0] = 1;
-  x[1] = 0;
-  x[2] = 0; 
-  x[3] = 0;
-
-  x[4] = 0;
-  x[5] = cos(alpha);
-  x[6] = sin(alpha);
-  x[7] = 0;
-
-  x[8] = 0;
-  x[9] = -sin(alpha);
-  x[10] = cos(alpha); 
-  x[11] = 0;
-
-  x[12] = 0;
-  x[13] = 0;
-  x[14] = 0;
-  x[15] = 1;
-
-  z[0] = cos(theta);
-  z[1] = sin(theta);
-  z[2] = 0;
-  z[3] = 0;
-
-  z[4] = -sin(theta);
-  z[5] = cos(theta);
-  z[6] = 0;
-  z[7] = 0;
-
-  z[8] = 0;
-  z[9] = 0;
-  z[10] = 1;
-  z[11] = 0;
-
-  z[12] = 0;
-  z[13] = 0;
-  z[14] = 0;
-  z[15] = 1;
-
-  glhMultMatrixRight(x, z);
-
-  z[12] = a + (z[8] * d);
-  z[13] = 0 + (z[9] * d);
-  z[14] = 0 + (z[10] * d);
-  z[15] = 1;
-
-  memcpy(A, z, 16 * sizeof(double));
-
-  return;
-
-  /*A[_00] = cos(theta);
-  A[_10] = sin(theta);
-  A[_20] = 0.0;
-  A[_30] = 0.0;
-  A[_01] = -sin(theta)*cos(alpha);
-  A[_11] = cos(theta)*cos(alpha);
-  A[_21] = sin(alpha);
-  A[_31] = 0.0;
-  A[_02] = sin(theta)*sin(alpha);
-  A[_12] = -cos(theta)*sin(alpha);
-  A[_22] = cos(alpha);
-  A[_32] = 0.0;
-  A[_03] = a * cos(theta);
-  A[_13] = a * sin(theta);
-  A[_23] = d;
-  A[_33] = 1.0;*/
-
-}
-
-
 // Concatenate kinematic chain transformations
 void extendChain(const DenavitHartenbergFrame& frame, GLdouble* A, float angle = 0.0)
 {
@@ -329,15 +121,15 @@ void extendChain(const DenavitHartenbergFrame& frame, GLdouble* A, float angle =
 	switch(frame.mJointType)
 	{
 		case JointTypeEnum::FIXED:
-      glhDenavitHartenbergPP(frame.mA * SCALE, frame.mAlpha, frame.mD * SCALE, frame.mTheta, DH);
+      glhDenavitHartenberg(frame.mA * SCALE, frame.mAlpha, frame.mD * SCALE, frame.mTheta, DH);
 		  break;
 
 		case JointTypeEnum::ROTARY:
-      glhDenavitHartenbergPP(frame.mA * SCALE, frame.mAlpha, frame.mD * SCALE, frame.mTheta + angle, DH);
+      glhDenavitHartenberg(frame.mA * SCALE, frame.mAlpha, frame.mD * SCALE, frame.mTheta + angle, DH);
 		  break;
 
 		case JointTypeEnum::PRISMATIC:
-      glhDenavitHartenbergPP(frame.mA * SCALE, frame.mAlpha, (frame.mD + angle) * SCALE, frame.mTheta, DH);
+      glhDenavitHartenberg(frame.mA * SCALE, frame.mAlpha, (frame.mD + angle) * SCALE, frame.mTheta, DH);
 		  break;
 	}
 
@@ -362,32 +154,17 @@ void buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, API_PSM& psm,
   extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[4], A, psm.sj_joint_angles[4]);
   extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[5], A, psm.sj_joint_angles[5]);
   extendChain(mDaVinciChain.mSUJ2TipPSM2Origin[0], A);
-  
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[0], A, psm.jnt_pos[0]);
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[1], A, psm.jnt_pos[1]);
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[2], A, psm.jnt_pos[2]);
-  
-  
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[3], A, psm.jnt_pos[3]);
 
-
-
-  ci::Matrix44d offset;
-  offset.setToIdentity();
-  //offset.setTranslate(ci::Vec3d(0, 0, -17.8));
-  offset.rotate(ci::Vec3f(0, 1, 0), 0);
-
   ci::Matrix44d to_return(A);
-  //glhMultMatrixRight(offset.m, to_return.m);
-  //glhMultMatrixRight(to_return.m, offset.m);
   frames.poses_.push_back(to_return);
 
-  //frames.all_frames_.push_back(ci::Matrix44d(A));
-  
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[4], A, psm.jnt_pos[4]);
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[5], A, psm.jnt_pos[5]);
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A);
-
 
   /* note the roll coordinate system is right at the end of the instrument, there is no
   translaation to the wrist coordiante system which has the same translation to both the
@@ -424,7 +201,6 @@ void buildKinematicChainECM1(DaVinciKinematicChain &mDaVinciChain, const API_ECM
 void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const API_PSM& psm, GLdouble* A, viz::Pose &suj_frames, viz::Pose &frames)
 {
 
-  assert(0);
   glhSetIdentity(A);
 
   extendChain(mDaVinciChain.mWorldOriginSUJ1Origin[0], A);
@@ -440,6 +216,10 @@ void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const API_PSM
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[1], A, psm.jnt_pos[1]);
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[2], A, psm.jnt_pos[2]);
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[3], A, psm.jnt_pos[3]);
+  
+  ci::Matrix44d to_return(A);
+  frames.poses_.push_back(to_return);
+  
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[4], A, psm.jnt_pos[4]);
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[5], A, psm.jnt_pos[5]);
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A);

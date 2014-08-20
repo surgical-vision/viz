@@ -43,11 +43,8 @@ namespace viz {
     struct DaVinciKinematicChain {
       // Construction
       DaVinciKinematicChain();
-      void SetupPSM1();
-      void SetupPSM2();
-      void SetupECM();
 
-      void UpdateChain(std::vector<double> &suj_joints, std::vector<double> &j_joints, DaVinciJoint joint_type);
+      //void UpdateChain(std::vector<double> &suj_joints, std::vector<double> &j_joints, DaVinciJoint joint_type);
 
       // PSM1
       std::vector<GeneralFrame> mWorldOriginSUJ1Origin;

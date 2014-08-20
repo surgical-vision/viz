@@ -15,9 +15,12 @@ namespace viz {
     void setupPoseGrabber(const std::string &filename);
     void setupDaVinciPoseGrabber(const std::string &suj_file, const std::string &j_file, const std::string &da_vinci_config, davinci::DaVinciJoint joint_type);
 
+    boost::shared_ptr<ttrk::IntuitiveSurgicalLND> getDaVinciTrackable() { return boost::dynamic_pointer_cast<ttrk::IntuitiveSurgicalLND>(trackable_); }
+    boost::shared_ptr<DaVinciPoseGrabber> getDVPoseGrabber() { return boost::dynamic_pointer_cast<DaVinciPoseGrabber>(pose_grabber_); }
+
   protected:
 
-    boost::scoped_ptr<ttrk::Model> trackable_;
+    boost::shared_ptr<ttrk::Model> trackable_;
     boost::shared_ptr<BasePoseGrabber> pose_grabber_;
 
   };

@@ -56,6 +56,7 @@ namespace viz {
 
   protected:
 
+    void convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose);
     void ReadDHFromFiles(std::vector<double> &psm_suj_joints, std::vector<double> &psm_joints);
 
     std::ifstream suj_ifs_;

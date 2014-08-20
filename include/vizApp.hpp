@@ -40,13 +40,12 @@ namespace viz {
     MayaCamUI maya_cam_;
     
     boost::scoped_ptr<ttrk::Handler> handler_;
-    boost::scoped_ptr<ttrk::Handler> tmp_handler_; //just for testing
 
     boost::scoped_ptr<BasePoseGrabber> camera_pg_;
     ci::Matrix44f camera_pose_;
         
-    std::vector< boost::scoped_ptr<Trackable> > moving_objects_pg_;
-    std::vector< ci::Matrix44f > moving_objects_pose_;
+    std::vector< std::pair<boost::shared_ptr<Trackable>, ci::Matrix44f> > moving_objects_pg_;
+    //std::vector< ci::Matrix44f > moving_objects_pose_;
 
     bool load_next_image_;
 
