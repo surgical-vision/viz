@@ -1,4 +1,5 @@
 #include "../include/vizApp.hpp"
+#include "../include/resources.hpp"
 #include <CinderOpenCV.h>
 
 using namespace viz;
@@ -6,45 +7,59 @@ using namespace viz;
 const int WINDOW_WIDTH = 736;
 const int WINDOW_HEIGHT = 288;
 
+GLfloat no_mat[] = { 0.0, 0.0, 0.0, 1.0 };
+ci::ColorA cNoMat = ci::ColorA(0.0f, 0.0f, 0.0f, 1.0f);
+
+GLfloat mat_ambient[] = { 0.6, 0.3, 0.4, 1.0 };
+ci::ColorA cAmbient = ci::ColorA(0.6f, 0.3f, 0.4f, 1.0f);
+
+GLfloat mat_diffuse[] = { 0.3, 0.5, 0.8, 1.0 };
+ci::ColorA cDiffuse = ci::ColorA(0.3f, 0.5f, 0.8f, 1.0f);
+
+GLfloat mat_specular[] = { 0.508273, 0.508273, 0.508273, 1.0 };
+ci::ColorA cSpecular = ci::ColorA(1.0f, 1.0f, 1.0f, 1.0f);
+
+GLfloat mat_emission[] = { 0.0, 0.1, 0.3, 0.0 };
+ci::ColorA cEmission = ci::ColorA(0.0f, 0.1f, 0.3f, 0.0f);
+
+GLfloat mat_shininess[] = { 0.4 };
+GLfloat no_shininess[] = { 0.0 };
+
 void vizApp::setup(){
 
   const std::string root_dir("../config");
   if (!boost::filesystem::is_directory(root_dir))
     throw std::runtime_error("Error, cannot file config dir!");
 
+  shader_ = gl::GlslProg(loadResource(RES_SHADER_VERT), loadResource(RES_SHADER_FRAG));
+
   const std::string left_input_video(root_dir + "/" + "left.avi");
   const std::string right_input_video(root_dir + "/" + "right.avi");
   const std::string output_video(root_dir + "/" + "g.avi");
   const std::string camera_suj_file(root_dir + "/dv/" +"cam_suj.txt");
   const std::string camera_j_file(root_dir + "/dv/" + "cam_j.txt");
-  const std::string psm1_suj_file(root_dir + "/dv/" +"psm1_suj.txt");
-  const std::string psm1_j_file(root_dir + "/dv/" +"psm1_j.txt");
-  const std::string psm2_suj_file(root_dir + "/dv/" + "psm2_suj.txt");
+  const std::string psm1_dv_suj_file(root_dir + "/dv/" +"psm1_suj.txt");
+  const std::string psm1_dv_j_file(root_dir + "/dv/" + "psm1_j.txt");
+  const std::string psm2_dv_suj_file(root_dir + "/dv/" + "psm2_suj.txt");
   const std::string psm2_dv_j_file(root_dir + "/dv/" + "psm2_j.txt");
   const std::string da_vinci_config_file(root_dir + "/dv/" +"model/model.json");
 
-  CameraPersp cam;
-  cam.setEyePoint(ci::Vec3f(0, 0, 0));
-  cam.setViewDirection(ci::Vec3f(0, 0, -1));
-  cam.setWorldUp(ci::Vec3f(0, 1, 0));
-  maya_cam_.setCurrentCam(cam);
-
   handler_.reset(new ttrk::StereoVideoHandler(left_input_video, right_input_video, output_video));
-  //tmp_handler_.reset(new ttrk::ImageHandler(root_dir + "/right/", root_dir + "/right_res/"));
   
   camera_pg_.reset(new DaVinciPoseGrabber(camera_suj_file, camera_j_file, davinci::ECM));
   camera_.Setup(root_dir + "/camera_config.xml", WINDOW_WIDTH, WINDOW_HEIGHT, 1, 1000);
     
-  moving_objects_pg_.push_back( std::make_pair<>(boost::shared_ptr<Trackable>(new Trackable()),ci::Matrix44f()));
-  moving_objects_pg_.back().first->setupDaVinciPoseGrabber(psm2_suj_file, psm2_dv_j_file, da_vinci_config_file, davinci::PSM2);
-  //moving_objects_pg_.push_back(std::make_pair<>(boost::scoped_ptr<Trackable>(new Trackable()), ci::Matrix44f()));
-  //moving_objects_pg_.back().first->setupDaVinciPoseGrabber(psm1_suj_file, psm1_dv_j_file, da_vinci_config_file, davinci::PSM1);
+  //moving_objects_pg_.push_back( std::make_pair<>(boost::shared_ptr<Trackable>(new Trackable()),std::vector<ci::Matrix44f>()));
+  //moving_objects_pg_.back().first->setupDaVinciPoseGrabber(psm2_dv_suj_file, psm2_dv_j_file, da_vinci_config_file, davinci::PSM2);
+  moving_objects_pg_.push_back(std::make_pair<>(boost::shared_ptr<Trackable>(new Trackable()), std::vector<ci::Matrix44f>()));
+  moving_objects_pg_.back().first->setupDaVinciPoseGrabber(psm1_dv_suj_file, psm1_dv_j_file, da_vinci_config_file, davinci::PSM1);
     
   setWindowSize(2 * WINDOW_WIDTH, WINDOW_HEIGHT);
   framebuffer_ = gl::Fbo(WINDOW_WIDTH, WINDOW_HEIGHT);
   load_next_image_ = true;
 
-  srand(time(NULL));
+  draw2 = true;
+  draw3 = true;
 
 }
 
@@ -64,14 +79,9 @@ void vizApp::update(){
 
     camera_pose_ = camera_pg_->getNextPose().poses_[0];
 
-    ci::app::console() << "Camera Pose = \n\n" << camera_pose_ << "\n";
-
     for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
       auto &mop = moving_objects_pg_[i];
-
-      mop.second = mop.first->getDVPoseGrabber()->getNextPose().poses_[0];
-
-      ci::app::console() << "Tool Pose = \n\n" << mop.second << "\n";
+      mop.second = mop.first->getDVPoseGrabber()->getNextPose().poses_;
     }
 
   }
@@ -96,35 +106,85 @@ void vizApp::draw(){
 
 void vizApp::drawTarget(){
 
+  glEnable(GL_LIGHTING);
+  glEnable(GL_LIGHT0);
+
+  GLfloat light_position[] = { 0, 0, 0, 30 };
+  glLightfv(GL_LIGHT0, GL_POSITION, light_position);
+  glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.0f);
+  glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.0f);
+  glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.00015f);
+
+  GLfloat mat[4];
+  
   for (auto mop : moving_objects_pg_){
 
-    gl::pushModelView();
-
-    const auto &pose = mop.second;
-    gl::multModelView(pose); //multiply by the pose of this tracked object
+    const std::vector<ci::Matrix44f> &pose = mop.second;
 
     auto meshes_textures_transforms = mop.first->getDaVinciTrackable()->GetRenderableMeshes();
 
-    for (auto mesh_tex_trans : meshes_textures_transforms){
+    for (std::size_t i = 0; i < meshes_textures_transforms.size(); ++i){
 
-      const auto &mesh = mesh_tex_trans.get<0>();
-      const auto &texture = mesh_tex_trans.get<1>();
-      const auto &transform = mesh_tex_trans.get<2>();
+      if (i == 1) continue;
+
+      if (!draw2 && i == 2) continue;
+      if (!draw3 && i == 3) continue;
+
+      if (i != 0){
+        
+        mat[0] = 0.19225;
+        mat[1] = 0.19225;
+        mat[2] = 0.19225;
+        mat[3] = 1.0;
+        glMaterialfv(GL_FRONT, GL_AMBIENT, mat);
+        mat[0] = 0.50754;
+        mat[1] = 0.50754;
+        mat[2] = 0.50754;
+        glMaterialfv(GL_FRONT, GL_DIFFUSE, mat);
+        mat[0] = 0.508273;
+        mat[1] = 0.508273;
+        mat[2] = 0.508273;
+        glMaterialfv(GL_FRONT, GL_SPECULAR, mat);
+        glMaterialf(GL_FRONT, GL_SHININESS, 0.4 * 128.0);
+      }
+      else{
+        mat[0] = 0.0;
+        mat[1] = 0.0;
+        mat[2] = 0.0;
+        mat[3] = 1.0;
+        glMaterialfv(GL_FRONT, GL_AMBIENT, mat);
+        mat[0] = 0.01;
+        mat[1] = 0.01;
+        mat[2] = 0.01;
+        glMaterialfv(GL_FRONT, GL_DIFFUSE, mat);
+        mat[0] = 0.50;
+        mat[1] = 0.50;
+        mat[2] = 0.50;
+        glMaterialfv(GL_FRONT, GL_SPECULAR, mat);
+        glMaterialf(GL_FRONT, GL_SHININESS, 0.25 * 128.0);
+      }
+
+      shader_.bind();
+      shader_.uniform("NumEnabledLights", 1);
 
       gl::pushModelView();
+      const auto &mesh = meshes_textures_transforms[i].get<0>();
+      const auto &texture = meshes_textures_transforms[i].get<1>();
+      //const auto &transform = mesh_tex_trans.get<2>();
+     
+      gl::multModelView(pose[i]); //multiply by the pose of this tracked object
 
-      gl::multModelView(transform);
       gl::draw(*mesh);
-      
+      //gl::drawCoordinateFrame();
       gl::popModelView();
-    }
-
-    gl::popModelView();
+      shader_.unbind();
+    }  
 
   }
 
-
-
+  
+  
+  glDisable(GL_LIGHTING);
 }
 
 
@@ -155,13 +215,7 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
 
   }
 
-  CameraPersp p = maya_cam_.getCamera();
-  ci::Vec3f tip_in_eye = p.worldToEye(moving_objects_pg_[0].second.getTranslate().xyz());
- 
-  ci::app::console() << "Point in eye = \n " << tip_in_eye << std::endl;
-
   drawTarget();
-  drawGrid();
 
   gl::popMatrices(); 
 
@@ -172,39 +226,6 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
 
 void vizApp::drawGrid(float size, float step){
   
-  //gl::pushModelView();
-
-  //static bool first = true;
-  //static std::vector<ci::Vec3f> points;
-  //if (first){
-
-  //  srand(time(NULL));
-  //  
-  //  for (int i = 0; i < 300; ++i){
-
-  //    float x = (float)rand() / RAND_MAX;
-  //    float y = (float)rand() / RAND_MAX;
-  //    float z = (float)rand() / RAND_MAX;
-
-  //    x = (x * 1000) - 500;
-  //    y = (y * 1000) - 500;
-  //    z = (z * 1000) - 500;
-
-  //    points.push_back(ci::Vec3f(x, y, z));
-
-  //  }
-
-  //  first = false;
-  //}
-
-  //for (auto pt : points){
-  //  gl::drawSphere(pt, 4);
-  //}
-
-  //gl::popModelView();
-
-  //return;
-
   gl::color(Colorf(0.2f, 0.2f, 0.2f));
 
   for (float i = 0; i <= size; i += step){
@@ -237,6 +258,14 @@ void vizApp::keyDown(KeyEvent event){
 
   if (event.getChar() == ' '){
     load_next_image_ = true;
+  }
+
+  if (event.getChar() == 'j'){
+    draw2 = !draw2;
+  }
+
+  if (event.getChar() == 'k'){
+    draw3 = !draw3;
   }
 
 }

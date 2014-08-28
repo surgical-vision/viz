@@ -111,9 +111,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ResourceCompile Include="Resources.rc" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="..\src\camera.cpp" />
     <ClCompile Include="..\src\davinci.cpp" />
     <ClCompile Include="..\src\pose_grabber.cpp" />
@@ -129,6 +126,11 @@
     <ClInclude Include="..\include\snippets.hpp" />
     <ClInclude Include="..\include\trackable.hpp" />
     <ClInclude Include="..\include\vizApp.hpp" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\resources\resources.rc" />
+    <ResourceCompile Include="viz.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

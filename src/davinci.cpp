@@ -114,7 +114,8 @@ DaVinciKinematicChain::DaVinciKinematicChain(void){
   mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(4, JointTypeEnum::ROTARY, 0.0f, 0.0f, PSM1_ToolLen, 0.0f));
   mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(5, JointTypeEnum::ROTARY, 0.0f, -PI_2, 0.0f, -PI_2));
   mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(6, JointTypeEnum::ROTARY, PSM1_PitchToYaw, -PI_2, 0.0f, -PI_2));
-  mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(7, JointTypeEnum::FIXED, 0.0f, -PI_2, PSM1_YawToCtrlPnt, 0.0f));
+  //mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(7, JointTypeEnum::FIXED, 0.0f, -PI_2, PSM1_YawToCtrlPnt, 0.0f));
+  mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(7, JointTypeEnum::ROTARY, 0.0f, -PI_2, PSM1_YawToCtrlPnt, 0.0f));
 
   // General transformation from world origin to SUJ2 origin (assumes alpha cart)
   mWorldOriginSUJ2Origin.push_back(GeneralFrame(0.1016f, -0.1016f, 0.43f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f));

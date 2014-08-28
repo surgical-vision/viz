@@ -1,4 +1,6 @@
 #include "snippets.hpp"
+#include <cinder/app/App.h>
+
 /******************************************************************************************************************************/
 
 // OpenGL matrix offsets
@@ -19,7 +21,7 @@
 #define _23 14
 #define _33 15
 
-const double SCALE = 100; //1000.0
+const double SCALE = 41.8; //1000.0
 
 // Set identity matrix
 void glhSetIdentity(GLdouble* A)
@@ -157,14 +159,23 @@ void buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, API_PSM& psm,
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[0], A, psm.jnt_pos[0]);
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[1], A, psm.jnt_pos[1]);
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[2], A, psm.jnt_pos[2]);
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[3], A, psm.jnt_pos[3]);
+  
 
-  ci::Matrix44d to_return(A);
-  frames.poses_.push_back(to_return);
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[3], A, psm.jnt_pos[3]);
+  ci::Matrix44d roll(A);
+  frames.poses_.push_back(roll);
 
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[4], A, psm.jnt_pos[4]);
+  ci::Matrix44d wrist_pitch(A);
+  frames.poses_.push_back(wrist_pitch);
+
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[5], A, psm.jnt_pos[5]);
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A);
+  ci::Matrix44d wrist_yaw(A);
+  frames.poses_.push_back(wrist_yaw);
+
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A, psm.jnt_pos[6]);
+  ci::Matrix44d grip(A);
+  frames.poses_.push_back(grip);
 
   /* note the roll coordinate system is right at the end of the instrument, there is no
   translaation to the wrist coordiante system which has the same translation to both the
@@ -194,6 +205,9 @@ void buildKinematicChainECM1(DaVinciKinematicChain &mDaVinciChain, const API_ECM
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[5], A);
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[6], A);
   frames.poses_.push_back(cinder::Matrix44d(A));
+
+  ci::app::console() << "CAmera pose = " << frames.poses_.back() << std::endl;
+
 }
 
 
@@ -215,13 +229,27 @@ void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const API_PSM
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[0], A, psm.jnt_pos[0]);
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[1], A, psm.jnt_pos[1]);
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[2], A, psm.jnt_pos[2]);
+  
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[3], A, psm.jnt_pos[3]);
-  
-  ci::Matrix44d to_return(A);
-  frames.poses_.push_back(to_return);
-  
+  ci::Matrix44d roll(A);
+  frames.poses_.push_back(roll);
+
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[4], A, psm.jnt_pos[4]);
+  ci::Matrix44d wrist_pitch(A);
+  frames.poses_.push_back(wrist_pitch);
+
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[5], A, psm.jnt_pos[5]);
-  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A);
+  ci::Matrix44d wrist_yaw(A);
+  frames.poses_.push_back(wrist_yaw);
+
+  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A, psm.jnt_pos[6]);
+  ci::Matrix44d grip(A);
+  frames.poses_.push_back(grip);
+  
+  if (wrist_yaw.getColumn(0) != grip.getColumn(0) && wrist_yaw.getColumn(3) != grip.getColumn(2) && wrist_yaw.getColumn(2) != grip.getColumn(3)){
+    ci::app::console() << "WY = \n\n" << wrist_yaw << "\n\nGRIP = \n\n" << grip << "\n" << std::endl;
+  
+  }
+
 }
 

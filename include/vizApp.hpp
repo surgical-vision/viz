@@ -4,11 +4,13 @@
 #include <cinder/gl/gl.h>
 #include <cinder/gl/Fbo.h>
 #include <cinder/gl/Texture.h>
+#include <cinder/gl/GlslProg.h>
 #include <cinder/MayaCamUI.h>
 #include "camera.hpp"
 #include <utils/handler.hpp>
 #include "pose_grabber.hpp"
 #include "trackable.hpp"
+
 
 using namespace ci;
 using namespace ci::app;
@@ -43,11 +45,16 @@ namespace viz {
 
     boost::scoped_ptr<BasePoseGrabber> camera_pg_;
     ci::Matrix44f camera_pose_;
-        
-    std::vector< std::pair<boost::shared_ptr<Trackable>, ci::Matrix44f> > moving_objects_pg_;
+    
+    gl::GlslProg shader_;
+
+    std::vector< std::pair<boost::shared_ptr<Trackable>, std::vector<ci::Matrix44f> > > moving_objects_pg_;
     //std::vector< ci::Matrix44f > moving_objects_pose_;
 
     bool load_next_image_;
+
+    bool draw2;
+    bool draw3;
 
   };
 

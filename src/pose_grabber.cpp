@@ -105,8 +105,6 @@ Pose DaVinciPoseGrabber::getNextPose(){
   std::vector<double> suj_joints, j_joints;
   ReadDHFromFiles(suj_joints, j_joints);
 
-  //chain_.UpdateChain(suj_joints, j_joints, target_joint_);
-
   Pose suj_frames, j_frames;
 
   if (target_joint_ == davinci::ECM){
@@ -122,12 +120,6 @@ Pose DaVinciPoseGrabber::getNextPose(){
 
     GLdouble ecm_transform[16];
     buildKinematicChainECM1(chain_, ecm, ecm_transform, suj_frames, j_frames);
-
-    ci::Matrix44f tmp;
-    //convertFromDaVinciPose(j_frames.poses_[0], tmp);
-    //j_frames.poses_[0] = tmp;
-
-    //convertFromDaVinciPose(t, j_frames.poses_[0]);
 
   }
 
@@ -157,6 +149,8 @@ Pose DaVinciPoseGrabber::getNextPose(){
 }
 
 void DaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
+
+  assert(0);
 
   out_pose.setToIdentity();
   
