@@ -61,8 +61,8 @@ void StereoCamera::Setup(const std::string &calibration_filename, const int imag
     fs["Extrinsic_Camera_Rotation"] >> rotation;
     fs["Extrinsic_Camera_Translation"] >> translation;
 
-    //convertBouguetToGLCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
-    convertBouguetToDaVinciCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
+    convertBouguetToGLCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
+    //convertBouguetToDaVinciCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
 
     left_eye_.Setup(l_intrinsic, l_distortion, image_width, image_height, near_clip_distance, far_clip_distance);
     right_eye_.Setup(r_intrinsic, r_distortion, image_width, image_height, near_clip_distance, far_clip_distance);
@@ -90,6 +90,11 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
   left_camera_matrix.at<double>(1, 2) = image_height - left_camera_matrix.at<double>(1, 2);
   right_camera_matrix.at<double>(1, 2) = image_height - right_camera_matrix.at<double>(1, 2);
 
+  extrinsic_rotation = extrinsic_rotation.inv();
+  extrinsic_translation = extrinsic_translation * -1;
+
+  /*
+
   //set the rotation matrix
   cv::Mat inv_rotation = extrinsic_rotation.inv();
   cv::Mat flip = cv::Mat::eye(3, 3, CV_64FC1);// [1, 0, 0; 0, -1, 0; 0, 0, -1];
@@ -98,9 +103,13 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
   cv::Mat in_gl_coords = flip * inv_rotation * flip;
   extrinsic_rotation = in_gl_coords.clone();
 
+  */
+
   //set the translation matrix by flipping x ( basically flip everything (we use inv transforms) then flip y and z so just flip x to get same result)
+  extrinsic_translation = 0.1 * extrinsic_translation;
+  
   //extrinsic_translation.at<double>(0, 0) *= -1;
-  extrinsic_translation.at<double>(2, 0) *= -1;
+  
   
 }
 
@@ -112,16 +121,16 @@ void StereoCamera::convertBouguetToDaVinciCoordinates(cv::Mat &left_camera_matri
 
   //set the rotation matrix
   cv::Mat inv_rotation = extrinsic_rotation.inv();
-  cv::Mat flip = cv::Mat::eye(3, 3, CV_64FC1);// [1, 0, 0; 0, -1, 0; 0, 0, -1];
+  
+  cv::Mat flip = cv::Mat::eye(3, 3, CV_64FC1);
   //flip.at<double>(1, 1) = -1; flip.at<double>(2, 2) = -1;
   flip.at<double>(1, 1) = -1; flip.at<double>(0, 0) = -1;
   cv::Mat in_gl_coords = flip * inv_rotation * flip;
   extrinsic_rotation = in_gl_coords.clone();
 
-  //set the translation matrix by flipping x ( basically flip everything (we use inv transforms) then flip y and z so just flip x to get same result)
-  extrinsic_translation = -0.1 * extrinsic_translation;
-  extrinsic_translation.at<double>(0, 0) *= -1;
-  extrinsic_translation.at<double>(1, 0) *= -1;
+  //set the translation matrix by flipping z ( basically flip everything (we use inv transforms) then flip y and z so just flip x to get same result)
+  //extrinsic_translation = 0.1 * extrinsic_translation;
+  extrinsic_translation.at<double>(2, 0) *= -1;
 
 }
 
@@ -171,12 +180,16 @@ void StereoCamera::moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &cur
 
   ci::gl::setMatrices(cam.getCamera());
 
+  left_eye_.getLight().setPosition(eye_point);
+  left_eye_.getLight().lookAt(eye_point, view_direction);
+  
   ci::gl::multModelView(current_camera_pose.inverted());
-
+  
+  /*
   const ci::Matrix44f current_pose = ci::gl::getModelView();
-
- /* left_eye_.getLight().setPosition(current_pose.getTranslate().xyz());
-  left_eye_.getLight().lookAt(current_pose.getTranslate().xyz(), ci::Vec3f(0,0,0));*/
+  left_eye_.getLight().setPosition(current_pose.getTranslate().xyz());
+  left_eye_.getLight().lookAt(current_pose.getTranslate().xyz(), ci::Vec3f(0,0,0));
+  */
 }
 
 void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose){
@@ -190,9 +203,7 @@ void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &cu
   view_direction = extrinsic_rotation_ * view_direction;
   world_up = extrinsic_rotation_ * world_up;
 
-  camP.setEyePoint(eye_point);
   camP.setEyePoint(extrinsic_translation_);
-
   camP.setViewDirection(view_direction);
   camP.setWorldUp(world_up);
 
@@ -201,12 +212,5 @@ void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &cu
   ci::gl::setMatrices(cam.getCamera());
 
   ci::gl::multModelView(current_camera_pose.inverted());
-
-
- 
-
- 
-
-  
 
 }

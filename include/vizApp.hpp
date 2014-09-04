@@ -10,7 +10,7 @@
 #include <utils/handler.hpp>
 #include "pose_grabber.hpp"
 #include "trackable.hpp"
-
+#include <boost/tuple/tuple.hpp>
 
 using namespace ci;
 using namespace ci::app;
@@ -29,9 +29,15 @@ namespace viz {
 
   protected:
 
-    void drawGrid(float size = 39, float step = 3);
+    void saveFrame(gl::Texture texture, bool isLeft);
+    void drawGrid(float size = 3.9, float step = 0.3);
     void drawTarget();
     void drawEye(gl::Texture &texture, bool is_left);
+
+    cv::VideoWriter write_left_;
+    cv::VideoWriter write_right_;
+    std::ofstream ofs_se3_;
+    std::ofstream ofs_dh_;
 
     StereoCamera camera_;
 
@@ -48,7 +54,8 @@ namespace viz {
     
     gl::GlslProg shader_;
 
-    std::vector< std::pair<boost::shared_ptr<Trackable>, std::vector<ci::Matrix44f> > > moving_objects_pg_;
+    std::vector< boost::tuple <boost::shared_ptr<Trackable>, std::vector<ci::Matrix44f>, std::vector<double> > > moving_objects_pg_;
+
     //std::vector< ci::Matrix44f > moving_objects_pose_;
 
     bool load_next_image_;

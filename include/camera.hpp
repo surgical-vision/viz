@@ -58,6 +58,8 @@ namespace viz {
     void setupCameras();
     void unsetCameras();
 
+    ci::gl::Light &getLight() { return left_eye_.getLight(); }
+
     void convertBouguetToGLCoordinates_3d(cv::Mat &rotation, cv::Mat &translation);
 
     ci::Vec3f getExtrinsicTranslation() const { return extrinsic_translation_; }

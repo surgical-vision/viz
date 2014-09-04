@@ -17,7 +17,7 @@ namespace viz {
 
     boost::shared_ptr<ttrk::IntuitiveSurgicalLND> getDaVinciTrackable() { return boost::dynamic_pointer_cast<ttrk::IntuitiveSurgicalLND>(trackable_); }
     boost::shared_ptr<DaVinciPoseGrabber> getDVPoseGrabber() { return boost::dynamic_pointer_cast<DaVinciPoseGrabber>(pose_grabber_); }
-
+    boost::shared_ptr<PoseGrabber> getPoseGrabber() { return boost::dynamic_pointer_cast<PoseGrabber>(pose_grabber_); }
   protected:
 
     boost::shared_ptr<ttrk::Model> trackable_;

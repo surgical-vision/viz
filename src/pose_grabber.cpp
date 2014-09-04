@@ -75,35 +75,45 @@ DaVinciPoseGrabber::DaVinciPoseGrabber(const std::string &in_suj_file, const std
 
 }
 
-Pose PoseGrabber::getNextPose(){
+Pose PoseGrabber::getPose(bool load_new){
 
-  ci::Matrix44f next_pose;
-  next_pose.setToIdentity();
+  
+  if (load_new){
 
-  try{
-    for (int i = 0; i < 4; ++i){
-      for (int j = 0; j < 4; ++j){
-        float val;
-        ifs_ >> val;
-        next_pose.at(i, j) = val;
+    gl_next_pose_.setToIdentity();
+
+    ci::Matrix44f next_pose;
+
+    next_pose.setToIdentity();
+
+    try{
+      for (int i = 0; i < 4; ++i){
+        for (int j = 0; j < 4; ++j){
+          float val;
+          ifs_ >> val;
+          next_pose.at(i, j) = val;
+        }
       }
     }
-  }
-  catch (std::ofstream::failure e){
-    next_pose.setToIdentity();
-  }
+    catch (std::ofstream::failure e){
+      next_pose.setToIdentity();
+    }
 
-  ci::Matrix44f gl_next_pose;
-  convertFromBouguetPose(next_pose, gl_next_pose);
+    gl_next_pose_ = next_pose;
+    //convertFromBouguetPose(next_pose, gl_next_pose_);
 
-  return gl_next_pose;
+  }
+  return Pose(gl_next_pose_);
 
 }
 
-Pose DaVinciPoseGrabber::getNextPose(){
+Pose DaVinciPoseGrabber::getPose(bool load_new){
 
-  std::vector<double> suj_joints, j_joints;
-  ReadDHFromFiles(suj_joints, j_joints);
+  if (load_new){
+    suj_joints.clear();
+    j_joints.clear();
+    ReadDHFromFiles(suj_joints, j_joints);
+  }
 
   Pose suj_frames, j_frames;
 
@@ -124,7 +134,7 @@ Pose DaVinciPoseGrabber::getNextPose(){
   }
 
   else if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
-    
+
     API_PSM psm;
 
     for (std::size_t i = 0; i < suj_joints.size(); ++i){
@@ -135,12 +145,16 @@ Pose DaVinciPoseGrabber::getNextPose(){
       psm.jnt_pos[i] = j_joints[i];
     }
 
+    j_frames.offsets_ = offsets_;
+
     GLdouble psm_transform[16];
     if (target_joint_ == davinci::PSM1)
       buildKinematicChainPSM1(chain_, psm, psm_transform, suj_frames, j_frames);
     else if (target_joint_ == davinci::PSM2)
       buildKinematicChainPSM2(chain_, psm, psm_transform, suj_frames, j_frames);
+
   }
+
 
   //translate then rotate gives the same results
 
@@ -148,25 +162,45 @@ Pose DaVinciPoseGrabber::getNextPose(){
 
 }
 
+void DaVinciPoseGrabber::savePoseAsSE3(std::ofstream &ofs, const ci::Matrix44d &camera_pose){
+
+}
+
+void DaVinciPoseGrabber::savePoseAsSE3AndDH(std::ofstream &ofs, const ci::Matrix44d &camera_pose){
+
+}
+
+void DaVinciPoseGrabber::setupOffsets(int n){
+    offsets_.reset(new std::vector<double>());
+    for (int i = 0; i < n; ++i){ 
+      offsets_->push_back(0); 
+    }
+}
+
 void DaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
 
-  assert(0);
+  
 
   out_pose.setToIdentity();
   
-  ci::Matrix33f flip;
+  ci::Matrix44f flip;
   flip.setToIdentity();
-  flip.at(0, 0) *= -1;
+  flip.at(1, 1) *= -1;
   flip.at(2, 2) *= -1;
-  ci::Quatf q(flip);
-  out_pose.rotate(q.getAxis(), q.getAngle());
 
-  ci::Vec3f translation = in_pose.getTranslate().xyz();
-  out_pose.translate(translation);
+  flip.invert();
+
+  out_pose = in_pose * flip;
+
+  //ci::Quatf q(flip);
+  //out_pose.rotate(q.getAxis(), q.getAngle());
+
+  //ci::Vec3f translation = in_pose.getTranslate().xyz();
+  //out_pose.translate(translation);
   
-  ci::Matrix33f in_gl_coords = in_pose.subMatrix33(0, 0);
-  ci::Quatf q2(in_gl_coords);
-  out_pose.rotate(q2.getAxis(), q2.getAngle());
+  //ci::Matrix33f in_gl_coords = in_pose.subMatrix33(0, 0);
+  //ci::Quatf q2(in_gl_coords);
+  //out_pose.rotate(q2.getAxis(), q2.getAngle());
 
   //ci::Vec3f translation = in_pose.getTranslate().xyz();
   //translation[0] *= -1;
