@@ -106,8 +106,7 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
   */
 
   //set the translation matrix by flipping x ( basically flip everything (we use inv transforms) then flip y and z so just flip x to get same result)
-  extrinsic_translation = 0.1 * extrinsic_translation;
-  
+ 
   //extrinsic_translation.at<double>(0, 0) *= -1;
   
   

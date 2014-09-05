@@ -156,32 +156,42 @@ void buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, API_PSM& psm,
   extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[3], A, psm.sj_joint_angles[3]);
   extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[4], A, psm.sj_joint_angles[4]);
   extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[5], A, psm.sj_joint_angles[5]);
+ 
   extendChain(mDaVinciChain.mSUJ2TipPSM2Origin[0], A);
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[0], A, psm.jnt_pos[0]);
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[1], A, psm.jnt_pos[1]);
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[2], A, psm.jnt_pos[2]);
-  
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[0], A, psm.jnt_pos[0] + frames.offsets_->operator[](0));
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[1], A, psm.jnt_pos[1] + frames.offsets_->operator[](1));
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[2], A, psm.jnt_pos[2] + frames.offsets_->operator[](2));
 
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[3], A, psm.jnt_pos[3]);
+  //add the instrument roll - this corresponds to a ref frame attached to the wrist end of the shaft around which the instrument rolls
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[3], A, psm.jnt_pos[3] + frames.offsets_->operator[](3));
   ci::Matrix44d roll(A);
-  frames.poses_.push_back(roll);
+  frames.poses_.push_back(std::make_pair<>(roll, psm.jnt_pos[3] + frames.offsets_->operator[](3)));
 
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[4], A, psm.jnt_pos[4]);
+  //add the instrument wrist pitch 
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[4], A, psm.jnt_pos[4] + frames.offsets_->operator[](4));
   ci::Matrix44d wrist_pitch(A);
-  frames.poses_.push_back(wrist_pitch);
+  frames.poses_.push_back(std::make_pair<>(wrist_pitch, psm.jnt_pos[4] + frames.offsets_->operator[](4)));
 
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[5], A, psm.jnt_pos[5]);
-  ci::Matrix44d wrist_yaw(A);
-  frames.poses_.push_back(wrist_yaw);
+  //don't actually care about wrist yaw as the clasper pose 'contains' this information
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[5], A, psm.jnt_pos[5] + frames.offsets_->operator[](5));
 
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A, psm.jnt_pos[6]);
-  ci::Matrix44d grip(A);
-  frames.poses_.push_back(grip);
+  //transform into the clasper reference frame
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A, 0);  //no dh param here as this just points in the direction of the instrument head
+  //frames.poses_.push_back(std::make_pair<>(ci::Matrix44d(A), psm.jnt_pos[5] + frames.offsets_->operator[](5)));
 
-  /* note the roll coordinate system is right at the end of the instrument, there is no
-  translaation to the wrist coordiante system which has the same translation to both the
-  wrist yaw and grip coordinate systems
-  */
+  //rotate the instrument claspers around the clasper axis 
+  ci::Matrix44d grip1(A);
+  ci::Matrix44d grip2(A);
+
+  //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
+  double val = psm.jnt_pos[6] + frames.offsets_->operator[](6);
+  grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  frames.poses_.push_back(std::make_pair(grip1, 0.5*val));
+
+  grip2.rotate(ci::Vec3d(0, 0, 1), M_PI);
+  grip2.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  frames.poses_.push_back(std::make_pair(grip2, 0.5*val));
+
 }
 
 /******************************************************************************************************************************/
@@ -205,7 +215,7 @@ void buildKinematicChainECM1(DaVinciKinematicChain &mDaVinciChain, const API_ECM
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[4], A);
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[5], A);
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[6], A);
-  frames.poses_.push_back(cinder::Matrix44d(A));
+  frames.poses_.push_back(std::make_pair(cinder::Matrix44d(A), 0));
 }
 
 
@@ -228,31 +238,35 @@ void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const API_PSM
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[1], A, psm.jnt_pos[1] + frames.offsets_->operator[](1));
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[2], A, psm.jnt_pos[2] + frames.offsets_->operator[](2));
   
+  //add the instrument roll - this corresponds to a ref frame attached to the wrist end of the shaft around which the instrument rolls
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[3], A, psm.jnt_pos[3] + frames.offsets_->operator[](3));
   ci::Matrix44d roll(A);
-  frames.poses_.push_back(roll);
+  frames.poses_.push_back(std::make_pair<>(roll, psm.jnt_pos[3] + frames.offsets_->operator[](3)));
 
+  //add the instrument wrist pitch 
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[4], A, psm.jnt_pos[4] + frames.offsets_->operator[](4));
   ci::Matrix44d wrist_pitch(A);
-  frames.poses_.push_back(wrist_pitch);
+  frames.poses_.push_back(std::make_pair<>(wrist_pitch, psm.jnt_pos[4] + frames.offsets_->operator[](4)));
 
-  
+  //don't actually care about wrist yaw as the clasper pose 'contains' this information
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[5], A, psm.jnt_pos[5] + frames.offsets_->operator[](5));
-  //don't actually care about wrist yaw    
-  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A, 0);  
+  
+  //transform into the clasper reference frame
+  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A, 0);  //no dh param here as this just points in the direction of the instrument head
+  //frames.poses_.push_back(std::make_pair<>(ci::Matrix44d(A), psm.jnt_pos[5] + frames.offsets_->operator[](5)));
 
+  //rotate the instrument claspers around the clasper axis 
   ci::Matrix44d grip1(A);
   ci::Matrix44d grip2(A);
 
-  double val = psm.jnt_pos[6];
-
+  //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
+  double val = psm.jnt_pos[6] + frames.offsets_->operator[](6);
   grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  frames.poses_.push_back(std::make_pair(grip1, 0.5*val));
+
   grip2.rotate(ci::Vec3d(0, 0, 1), M_PI);
-  grip2.rotate(ci::Vec3d(0, 1, 0), M_PI / 2);
   grip2.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
-  
-  frames.poses_.push_back(grip1);
-  frames.poses_.push_back(grip2);
+  frames.poses_.push_back(std::make_pair(grip2,0.5*val)); 
   
 }
 

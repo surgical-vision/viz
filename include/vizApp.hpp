@@ -20,12 +20,13 @@ namespace viz {
   class vizApp : public AppNative {
 
   public:
-    void setup();
-    void mouseDown(MouseEvent event);
-    void update();
-    void draw();
-    void keyDown(KeyEvent event);
-    void mouseDrag(MouseEvent event);
+    virtual void setup() override;
+    virtual void mouseDown(MouseEvent event) override;
+    virtual void update() override;
+    virtual void draw() override;
+    virtual void keyDown(KeyEvent event) override;
+    virtual void mouseDrag(MouseEvent event) override;
+    virtual void shutdown() override;
 
   protected:
 
@@ -33,11 +34,13 @@ namespace viz {
     void drawGrid(float size = 3.9, float step = 0.3);
     void drawTarget();
     void drawEye(gl::Texture &texture, bool is_left);
+    void savePoseAsSE3(std::ofstream &ofs, const ci::Matrix44d &camera_pose, const Pose &pose);
+    void savePoseAsSE3AndDH(std::ofstream &ofs, const ci::Matrix44d &camera_pose, const Pose &pose);
 
     cv::VideoWriter write_left_;
     cv::VideoWriter write_right_;
-    std::ofstream ofs_se3_;
-    std::ofstream ofs_dh_;
+    //std::ofstream ofs_se3_;
+    //std::ofstream ofs_dh_;
 
     StereoCamera camera_;
 
@@ -51,14 +54,17 @@ namespace viz {
 
     boost::scoped_ptr<BasePoseGrabber> camera_pg_;
     ci::Matrix44f camera_pose_;
-    
+    std::ofstream ofs_cam_;
+
     gl::GlslProg shader_;
 
-    std::vector< boost::tuple <boost::shared_ptr<Trackable>, std::vector<ci::Matrix44f>, std::vector<double> > > moving_objects_pg_;
-
+    std::vector< boost::shared_ptr<Trackable> > moving_objects_pg_;
+    
     //std::vector< ci::Matrix44f > moving_objects_pose_;
 
     bool load_next_image_;
+    bool save_next_image_;
+    bool save_toggle_;
 
     bool draw2;
     bool draw3;

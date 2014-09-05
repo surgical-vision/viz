@@ -12,10 +12,8 @@ namespace viz {
   struct Pose {
   
     Pose() {}
-    Pose(ci::Matrix44f &val) { poses_.push_back(val); }
-
-    std::vector<ci::Matrix44f> poses_;  
-  
+    Pose(ci::Matrix44f &val) { poses_.push_back(std::make_pair<>(val,0.0)); }
+    std::vector<std::pair<ci::Matrix44f,double> > poses_;  
     boost::shared_ptr< std::vector<double> > offsets_;
 
   };
@@ -25,19 +23,12 @@ namespace viz {
 
   public:
     
-    BasePoseGrabber() : saving_(false) {}
     virtual Pose getPose(bool load_new) = 0;
-    virtual ~BasePoseGrabber() {};
-    
-    void setSave(bool to_save){
-      saving_ = to_save; 
-    }
+    virtual ~BasePoseGrabber() {};  
 
   protected:
-
     void convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose);
 
-    bool saving_;
 
   };
 
@@ -65,13 +56,10 @@ namespace viz {
     DaVinciPoseGrabber(const std::string &in_suj_file, const std::string &in_j_file, const davinci::DaVinciJoint joint_type);
     virtual Pose getPose(bool load_new);
     void setupOffsets(int n);
-
     boost::shared_ptr< std::vector<double> > getOffsets() { return offsets_; }
 
   protected:
 
-    void savePoseAsSE3(std::ofstream &ofs, const ci::Matrix44d &camera_pose);
-    void savePoseAsSE3AndDH(std::ofstream &ofs, const ci::Matrix44d &camera_pose);
     void convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose);
     void ReadDHFromFiles(std::vector<double> &psm_suj_joints, std::vector<double> &psm_joints);
 

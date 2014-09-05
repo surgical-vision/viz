@@ -162,14 +162,6 @@ Pose DaVinciPoseGrabber::getPose(bool load_new){
 
 }
 
-void DaVinciPoseGrabber::savePoseAsSE3(std::ofstream &ofs, const ci::Matrix44d &camera_pose){
-
-}
-
-void DaVinciPoseGrabber::savePoseAsSE3AndDH(std::ofstream &ofs, const ci::Matrix44d &camera_pose){
-
-}
-
 void DaVinciPoseGrabber::setupOffsets(int n){
     offsets_.reset(new std::vector<double>());
     for (int i = 0; i < n; ++i){ 
