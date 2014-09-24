@@ -36,6 +36,8 @@ namespace viz {
     void drawEye(gl::Texture &texture, bool is_left);
     void savePoseAsSE3(std::ofstream &ofs, const ci::Matrix44d &camera_pose, const Pose &pose);
     void savePoseAsSE3AndDH(std::ofstream &ofs, const ci::Matrix44d &camera_pose, const Pose &pose);
+    void draw3D(); 
+    void drawTarget(ci::Matrix44f &inverse);
 
     cv::VideoWriter write_left_;
     cv::VideoWriter write_right_;
@@ -53,6 +55,9 @@ namespace viz {
     boost::scoped_ptr<ttrk::Handler> handler_;
 
     boost::scoped_ptr<BasePoseGrabber> camera_pg_;
+    boost::scoped_ptr<BasePoseGrabber> camera_estimates_;
+
+    ci::Matrix44f camera_estimate_matrix_;
     ci::Matrix44f camera_pose_;
     std::ofstream ofs_cam_;
 
@@ -68,6 +73,7 @@ namespace viz {
 
     bool draw2;
     bool draw3;
+    bool draw3d;
 
   };
 

@@ -15,6 +15,7 @@ namespace viz {
     Pose(ci::Matrix44f &val) { poses_.push_back(std::make_pair<>(val,0.0)); }
     std::vector<std::pair<ci::Matrix44f,double> > poses_;  
     boost::shared_ptr< std::vector<double> > offsets_;
+    boost::shared_ptr< std::vector<double> > base_offsets_;
 
   };
 
@@ -57,7 +58,7 @@ namespace viz {
     virtual Pose getPose(bool load_new);
     void setupOffsets(int n);
     boost::shared_ptr< std::vector<double> > getOffsets() { return offsets_; }
-
+    boost::shared_ptr< std::vector<double> > getBaseOffsets() { return base_offsets_; }
   protected:
 
     void convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose);
@@ -73,6 +74,8 @@ namespace viz {
     davinci::DaVinciJoint target_joint_;
 
     boost::shared_ptr< std::vector<double> > offsets_; 
+    boost::shared_ptr< std::vector<double> > base_offsets_;
+
     std::vector<double> suj_joints, j_joints;
 
   };

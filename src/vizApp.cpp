@@ -1,7 +1,9 @@
-#include "../include/vizApp.hpp"
-#include "../include/resources.hpp"
 #include <CinderOpenCV.h>
 #include <locale>
+
+#include "../include/config_reader.hpp"
+#include "../include/vizApp.hpp"
+#include "../include/resources.hpp"
 
 using namespace viz;
 
@@ -13,62 +15,53 @@ const int WINDOW_HEIGHT = 288;
 
 void vizApp::setup(){
 
-  const std::string root_dir("../config/synth/");
-  if (!boost::filesystem::is_directory(root_dir))
+  std::vector<std::string> cmd_line_args = getArgs();
+
+  if (cmd_line_args.size() < 2){
+    throw std::runtime_error("Error.");
+  }
+
+  ConfigReader reader(cmd_line_args[1]);
+
+  if (!boost::filesystem::is_directory(reader.get_element("root_dir")))
     throw std::runtime_error("Error, cannot file config dir!");
 
-  if (!boost::filesystem::is_directory(root_dir + "/output/")){
-    boost::filesystem::create_directory(root_dir + "/output/");
+  if (!boost::filesystem::is_directory(reader.get_element("output"))){
+    boost::filesystem::create_directory(reader.get_element("output"));
   }
 
   shader_ = gl::GlslProg(loadResource(RES_SHADER_VERT), loadResource(RES_SHADER_FRAG));
 
-  const std::string left_input_video(root_dir + "/" + "left.avi");
-  const std::string right_input_video(root_dir + "/" + "right.avi");
-  const std::string output_video(root_dir + "/" + "g.avi");
-
-  const std::string camera_suj_file(root_dir + "/dv/" +"cam_suj.txt");
-  const std::string camera_j_file(root_dir + "/dv/" + "cam_j.txt");
-  const std::string cam_se3_file(root_dir + "/output/" + "cam_se3.txt");
-
-  const std::string psm1_dv_suj_file(root_dir + "/dv/" +"psm1_suj.txt");
-  const std::string psm1_dv_j_file(root_dir + "/dv/" + "psm1_j.txt");
-  const std::string psm1_dh_file(root_dir + "/output/" + "psm1_dh.txt");
-  const std::string psm1_se3_file(root_dir + "/output/" + "psm1_se3.txt");
-
-  const std::string psm2_dv_suj_file(root_dir + "/dv/" + "psm2_suj.txt");
-  const std::string psm2_dv_j_file(root_dir + "/dv/" + "psm2_j.txt");
-  const std::string psm2_dh_file(root_dir + "/output/" + "psm2_dh.txt");
-  const std::string psm2_se3_file(root_dir + "/output/" + "psm2_se3.txt");
-
-  const std::string da_vinci_config_file(root_dir + "/dv/" +"model/model.json");
-
-  write_left_.open(root_dir + "/output/ouput_left.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(WINDOW_WIDTH, WINDOW_HEIGHT));
-  write_right_.open(root_dir + "/output/ouput_right.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(WINDOW_WIDTH, WINDOW_HEIGHT));
-
+  //open video writer
+  write_left_.open(reader.get_element("output") + "/" + reader.get_element("left_output_video"), CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(WINDOW_WIDTH, WINDOW_HEIGHT));
+  write_right_.open(reader.get_element("output") + "/" + reader.get_element("right_output_video"), CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(WINDOW_WIDTH, WINDOW_HEIGHT));
   if (!write_left_.isOpened() || !write_right_.isOpened()){
     throw std::runtime_error("Error, couldn't open video file!");
   }
-
-  //handler_.reset(new ttrk::StereoVideoHandler(left_input_video, right_input_video, output_video));
   
-  ofs_cam_.open(cam_se3_file);
+  //open video reader
+  handler_.reset(new ttrk::StereoVideoHandler(reader.get_element("root_dir") + "/" + reader.get_element("left_input_video"), reader.get_element("root_dir") + "/" + reader.get_element("right_input_video"), ""));
+  
+  //open 
+  ofs_cam_.open(reader.get_element("output") + "/" + reader.get_element("cam_se3_file"));
   if (!ofs_cam_.is_open()){
     throw std::runtime_error("Error, cannot open the camera processing file.");
   }
 
-  camera_pg_.reset(new DaVinciPoseGrabber(camera_suj_file, camera_j_file, davinci::ECM));
-  camera_.Setup(root_dir + "/camera_config.xml", WINDOW_WIDTH, WINDOW_HEIGHT, 1, 1000);
-  
+  camera_pg_.reset(new DaVinciPoseGrabber(reader.get_element("root_dir") + "/" + reader.get_element("camera_suj_file"), reader.get_element("root_dir") + "/" + reader.get_element("camera_j_file"), davinci::ECM));
+  camera_.Setup(reader.get_element("root_dir") + "/" + reader.get_element("camera_config"), WINDOW_WIDTH, WINDOW_HEIGHT, 1, 1000);
+
+  camera_estimates_.reset(new PoseGrabber(reader.get_element("root_dir") + "/" + reader.get_element("camera_estimate_file")));
+  camera_estimate_matrix_.setToIdentity();
+
   moving_objects_pg_.push_back(boost::shared_ptr<Trackable>(new Trackable()));
-  moving_objects_pg_.back()->setupDaVinciPoseGrabber(psm2_dv_suj_file, psm2_dv_j_file, psm2_dh_file, psm2_se3_file, da_vinci_config_file, davinci::PSM2);
+  moving_objects_pg_.back()->setupDaVinciPoseGrabber(reader.get_element("root_dir") + "/" + reader.get_element("psm2_suj_file"), reader.get_element("root_dir") + "/" + reader.get_element("psm2_j_file"), reader.get_element("output") + "/" + reader.get_element("psm1_dh_file"), reader.get_element("output") + "/" + reader.get_element("psm1_se3_file"), reader.get_element("root_dir") + "/" + reader.get_element("da_vinci_config_file"), davinci::PSM1);
+
   moving_objects_pg_.back()->getDVPoseGrabber()->setupOffsets(7);
 
   moving_objects_pg_.push_back(boost::shared_ptr<Trackable>(new Trackable()));
-  moving_objects_pg_.back()->setupDaVinciPoseGrabber(psm1_dv_suj_file, psm1_dv_j_file, psm1_dh_file, psm1_se3_file, da_vinci_config_file, davinci::PSM1);
+  moving_objects_pg_.back()->setupDaVinciPoseGrabber(reader.get_element("root_dir") + "/" + reader.get_element("psm1_suj_file"), reader.get_element("root_dir") + "/" + reader.get_element("psm1_j_file"), reader.get_element("output") + "/" + reader.get_element("psm1_dh_file"), reader.get_element("output") + "/" + reader.get_element("psm1_se3_file"), reader.get_element("root_dir") + "/" + reader.get_element("da_vinci_config_file"), davinci::PSM1);
   moving_objects_pg_.back()->getDVPoseGrabber()->setupOffsets(7);
-
-  //moving_objects_pg_.back().get<0>()->setupPoseGrabber(root_dir + "/dv/grid.txt");
 
   setWindowSize(2 * WINDOW_WIDTH, WINDOW_HEIGHT);
   framebuffer_ = gl::Fbo(WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -79,12 +72,22 @@ void vizApp::setup(){
 
   draw2 = true;
   draw3 = true;
+  draw3d = false;
+
+  // set up the camera
+  CameraPersp cam;
+  cam.setEyePoint(Vec3f(5.0f, 10.0f, 10.0f));
+  cam.setCenterOfInterestPoint(Vec3f(0.0f, 2.5f, 0.0f));
+  cam.setPerspective(60.0f, getWindowAspectRatio(), 1.0f, 1000.0f);
+  maya_cam_.setCurrentCam(cam);
 
 }
 
 void vizApp::update(){
 
   camera_pose_ = camera_pg_->getPose(load_next_image_).poses_[0].first;
+
+  camera_estimate_matrix_ = camera_estimates_->getPose(load_next_image_).poses_[0].first;
 
   for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
     auto &mop = moving_objects_pg_[i];
@@ -93,13 +96,15 @@ void vizApp::update(){
   
   if (load_next_image_){
 
-    //cv::Mat stereo_image = handler_->GetNewFrame();
-    cv::Mat stereo_image = cv::Mat::zeros(cv::Size(WINDOW_WIDTH * 2, WINDOW_HEIGHT), CV_8UC3);
-    for (int r = 0; r < stereo_image.rows; ++r){
-      for (int c = 0; c < stereo_image.cols; ++c){
-        stereo_image.at<cv::Vec3b>(r, c) = cv::Vec3b(0, 0, 255);
-      }
-    }
+    cv::Mat stereo_image = handler_->GetNewFrame();
+    
+    //cv::Mat stereo_image = cv::Mat::zeros(cv::Size(WINDOW_WIDTH * 2, WINDOW_HEIGHT), CV_8UC3);
+    //for (int r = 0; r < stereo_image.rows; ++r){
+    //    for (int c = 0; c < stereo_image.cols; ++c){
+    //        stereo_image.at<cv::Vec3b>(r, c) = cv::Vec3b(0, 0, 255);
+    //    }
+    //}
+    
 
     cv::Mat left_frame = stereo_image(cv::Rect(0, 0, stereo_image.cols / 2, stereo_image.rows));
     cv::Mat right_frame = stereo_image(cv::Rect(stereo_image.cols / 2, 0, stereo_image.cols / 2, stereo_image.rows));
@@ -115,7 +120,7 @@ void vizApp::update(){
 
 void vizApp::draw(){
 	// clear out the window with black
-	gl::clear( Color( 0, 0, 0 ) ); 
+  gl::clear( Color( 0, 0, 0 ) ); 
 
   framebuffer_.bindFramebuffer();
   drawEye(left_texture_, true);
@@ -124,12 +129,66 @@ void vizApp::draw(){
   saveFrame(framebuffer_.getTexture(), true); //remember only saves when save_next_frame_ is true, right call turns this off
 
   framebuffer_.bindFramebuffer();
-  drawEye(right_texture_, false);
+
+  if (draw3d){
+    draw3D();
+  }else{
+    drawEye(right_texture_, false);
+  }
   framebuffer_.unbindFramebuffer();
   gl::draw(framebuffer_.getTexture(), ci::Rectf((float)framebuffer_.getWidth(), (float)framebuffer_.getHeight(), 2.0 * framebuffer_.getWidth(), 0.0));
   saveFrame(framebuffer_.getTexture(), false); //remember only saves when save_next_frame_ is true, right call turns this off
   
 
+}
+
+void vizApp::draw3D(){
+  
+  gl::clear(Color(1, 0, 0));
+
+  static ci::Matrix44f first_camera_pose = camera_pose_;
+
+  ci::CameraPersp cam;
+  cam.setEyePoint(ci::Vec3f(0, 0, 0));
+  cam.setViewDirection(ci::Vec3f(0, 0, 1));
+  cam.setWorldUp(ci::Vec3f(0, -1, 0));
+
+  ci::CameraPersp maya;
+  maya.setEyePoint(ci::Vec3f(100, 0, -150));
+  maya.setWorldUp(ci::Vec3f(0, -1, 0));
+  maya.lookAt(ci::Vec3f(0, 0, 5));
+  
+  
+  gl::pushMatrices();
+
+  //gl::setMatrices(maya_cam_.getCamera());
+  gl::setMatrices(maya);
+
+  camera_.setupCameras();
+
+  gl::pushModelView();
+
+  //ci::Matrix44f update_to_camera_pose = camera_pose_ * first_camera_pose.inverted();
+  ci::Matrix44f update_to_camera_pose = first_camera_pose.inverted() * camera_pose_;
+
+  gl::multModelView(update_to_camera_pose); 
+  
+  gl::drawFrustum(cam);
+  
+  gl::popModelView();
+
+  gl::pushModelView(); 
+
+  gl::multModelView(first_camera_pose.inverted());
+  drawTarget();
+
+  gl::popModelView();
+
+  camera_.unsetCameras();
+  gl::popMatrices();
+  
+  //draw camera frustrum
+  //move camera to new viewpoint and point at origin
 }
 
 void vizApp::saveFrame(gl::Texture texture, bool isLeft){
@@ -139,7 +198,7 @@ void vizApp::saveFrame(gl::Texture texture, bool isLeft){
   }
 
   cv::Mat frame = toOcv(texture), flipped;
-  cv::flip(frame, flipped, 1);
+  cv::flip(frame, flipped, 0);
 
   if (isLeft){
     write_left_ << flipped;
@@ -212,6 +271,9 @@ void vizApp::drawTarget(){
      
       gl::multModelView(pose.poses_[i].first); //multiply by the pose of this tracked object
 
+      //if (i == 0)
+      // ci::app::console() << "model view = " << ci::gl::getModelView() << std::endl;
+
       gl::draw(*mesh);
 
       gl::popModelView();
@@ -248,11 +310,14 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
 
   if (is_left){
     camera_.makeLeftEyeCurrent();
+    //ci::app::console() << "left cam ";
   }
   else{
     camera_.makeRightEyeCurrent();
+    //ci::app::console() << "right cam ";
   }
 
+  
   drawTarget();
   drawGrid();
 
@@ -304,7 +369,7 @@ void vizApp::drawGrid(float size, float step){
 
 inline void writePose(std::ofstream &ofs, const std::string &title, const ci::Matrix44d &obj_pose, const ci::Matrix44d &cam_pose){
   
-  ci::Matrix44d in_cam_coords = obj_pose * cam_pose.inverted(); 
+  ci::Matrix44d in_cam_coords = cam_pose.inverted() * obj_pose;
 
   ofs << "#" + title + "\n";
   ofs << in_cam_coords;
@@ -363,29 +428,29 @@ void vizApp::mouseDown(MouseEvent event){
   maya_cam_.mouseDown(event.getPos());
 }
 
-
 void vizApp::keyDown(KeyEvent event){
 
   if (event.getChar() == ' '){
     load_next_image_ = true;
     return;
   }
-
-  if (event.getChar() == 'j'){
+  else if (event.getChar() == 'j'){
     draw2 = !draw2;
     return;
   }
-
-  if (event.getChar() == 'k'){
+  else if (event.getChar() == 'k'){
     draw3 = !draw3;
     return;
   }
-
-  if (event.getChar() == 's'){
+  else if (event.getChar() == 's'){
     save_toggle_ = !save_toggle_;
     return;
   }
-
+  else if (event.getChar() == 'a'){
+    draw3d = !draw3d;
+    return;
+  }
+  
   static int current_model_idx = 0;
 
   if (moving_objects_pg_.size() == 0)
@@ -403,6 +468,7 @@ void vizApp::keyDown(KeyEvent event){
   }
   
   boost::shared_ptr< std::vector< double > > offsets = moving_objects_pg_[current_model_idx]->getDVPoseGrabber()->getOffsets();
+  boost::shared_ptr< std::vector< double > > base_offsets = moving_objects_pg_[current_model_idx]->getDVPoseGrabber()->getBaseOffsets();
 
   if (offsets->size() == 0)
     return;
@@ -451,10 +517,56 @@ void vizApp::keyDown(KeyEvent event){
     (*offsets)[6] -= 0.004;
   }
 
+  if (event.getChar() == 'Q'){
+      (*base_offsets)[0] += 0.001;
+  }
+  else if (event.getChar() == 'W'){
+      (*base_offsets)[1] += 0.001;
+  }
+  else if (event.getChar() == 'E'){
+      (*base_offsets)[2] += 0.001;
+  }
+  else if (event.getChar() == 'R'){
+      (*base_offsets)[3] += 0.001;
+  }
+  else if (event.getChar() == 'T'){
+      (*base_offsets)[4] += 0.001;
+  }
+  else if (event.getChar() == 'Y'){
+      (*base_offsets)[5] += 0.001;
+  }
+  
+  else if (event.getChar() == 'Z'){
+      (*base_offsets)[0] -= 0.001;
+  }
+  else if (event.getChar() == 'X'){
+      (*base_offsets)[1] -= 0.001;
+  }
+  else if (event.getChar() == 'C'){
+      (*base_offsets)[2] -= 0.001;
+  }
+  else if (event.getChar() == 'V'){
+      (*base_offsets)[3] -= 0.001;
+  }
+  else if (event.getChar() == 'B'){
+      (*base_offsets)[4] -= 0.001;
+  }
+  else if (event.getChar() == 'N'){
+      (*base_offsets)[5] -= 0.001;
+  }
+  
+
+
   if (offsets != nullptr){
     ci::app::console() << "Offset = [ ";
     for (auto i : *offsets){
       ci::app::console() << i << ", ";
+    }
+    ci::app::console() << "]" << std::endl;
+
+    ci::app::console() << "Base Offset = [ ";
+    for (auto i : *base_offsets){
+        ci::app::console() << i << ", ";
     }
     ci::app::console() << "]" << std::endl;
   }

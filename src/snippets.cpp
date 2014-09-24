@@ -150,12 +150,12 @@ void buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, API_PSM& psm,
 {
   glhSetIdentity(A);
   extendChain(mDaVinciChain.mWorldOriginSUJ2Origin[0], A);
-  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[0], A, psm.sj_joint_angles[0]);
-  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[1], A, psm.sj_joint_angles[1]);
-  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[2], A, psm.sj_joint_angles[2]);
-  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[3], A, psm.sj_joint_angles[3]);
-  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[4], A, psm.sj_joint_angles[4]);
-  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[5], A, psm.sj_joint_angles[5]);
+  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[0], A, psm.sj_joint_angles[0] + frames.base_offsets_->operator[](0));
+  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[1], A, psm.sj_joint_angles[1] + frames.base_offsets_->operator[](1));
+  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[2], A, psm.sj_joint_angles[2] + frames.base_offsets_->operator[](2));
+  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[3], A, psm.sj_joint_angles[3] + frames.base_offsets_->operator[](3));
+  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[4], A, psm.sj_joint_angles[4] + frames.base_offsets_->operator[](4));
+  extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[5], A, psm.sj_joint_angles[5] + frames.base_offsets_->operator[](5));
  
   extendChain(mDaVinciChain.mSUJ2TipPSM2Origin[0], A);
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[0], A, psm.jnt_pos[0] + frames.offsets_->operator[](0));
@@ -226,12 +226,12 @@ void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const API_PSM
   glhSetIdentity(A);
 
   extendChain(mDaVinciChain.mWorldOriginSUJ1Origin[0], A);
-  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[0], A, psm.sj_joint_angles[0]);
-  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[1], A, psm.sj_joint_angles[1]);
-  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[2], A, psm.sj_joint_angles[2]);
-  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[3], A, psm.sj_joint_angles[3]);
-  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[4], A, psm.sj_joint_angles[4]);
-  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[5], A, psm.sj_joint_angles[5]);
+  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[0], A, psm.sj_joint_angles[0] + frames.base_offsets_->operator[](0));
+  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[1], A, psm.sj_joint_angles[1] + frames.base_offsets_->operator[](1));
+  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[2], A, psm.sj_joint_angles[2] + frames.base_offsets_->operator[](2));
+  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[3], A, psm.sj_joint_angles[3] + frames.base_offsets_->operator[](3));
+  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[4], A, psm.sj_joint_angles[4] + frames.base_offsets_->operator[](4));
+  extendChain(mDaVinciChain.mSUJ1OriginSUJ1Tip[5], A, psm.sj_joint_angles[5] + frames.base_offsets_->operator[](5));
 
   extendChain(mDaVinciChain.mSUJ1TipPSM1Origin[0], A);
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[0], A, psm.jnt_pos[0] + frames.offsets_->operator[](0));
@@ -242,6 +242,7 @@ void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const API_PSM
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[3], A, psm.jnt_pos[3] + frames.offsets_->operator[](3));
   ci::Matrix44d roll(A);
   frames.poses_.push_back(std::make_pair<>(roll, psm.jnt_pos[3] + frames.offsets_->operator[](3)));
+  
 
   //add the instrument wrist pitch 
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[4], A, psm.jnt_pos[4] + frames.offsets_->operator[](4));
@@ -250,7 +251,8 @@ void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const API_PSM
 
   //don't actually care about wrist yaw as the clasper pose 'contains' this information
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[5], A, psm.jnt_pos[5] + frames.offsets_->operator[](5));
-  
+  ci::Matrix44d wrist_yaw(A);
+
   //transform into the clasper reference frame
   extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A, 0);  //no dh param here as this just points in the direction of the instrument head
   //frames.poses_.push_back(std::make_pair<>(ci::Matrix44d(A), psm.jnt_pos[5] + frames.offsets_->operator[](5)));
@@ -267,6 +269,6 @@ void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const API_PSM
   grip2.rotate(ci::Vec3d(0, 0, 1), M_PI);
   grip2.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
   frames.poses_.push_back(std::make_pair(grip2,0.5*val)); 
-  
+    
 }
 

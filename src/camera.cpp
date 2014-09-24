@@ -90,6 +90,8 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
   left_camera_matrix.at<double>(1, 2) = image_height - left_camera_matrix.at<double>(1, 2);
   right_camera_matrix.at<double>(1, 2) = image_height - right_camera_matrix.at<double>(1, 2);
 
+  ci::app::console() << "Extrinsic transformation from file = " << extrinsic_rotation << "\n\n" << extrinsic_translation << "\n";
+
   extrinsic_rotation = extrinsic_rotation.inv();
   extrinsic_translation = extrinsic_translation * -1;
 
@@ -179,9 +181,11 @@ void StereoCamera::moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &cur
 
   ci::gl::setMatrices(cam.getCamera());
 
+  //ci::app::console() << "Model view for left = " << ci::gl::getModelView() << "\n\n" << std::endl;
+
   left_eye_.getLight().setPosition(eye_point);
   left_eye_.getLight().lookAt(eye_point, view_direction);
-  
+ 
   ci::gl::multModelView(current_camera_pose.inverted());
   
   /*
@@ -209,6 +213,8 @@ void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &cu
   cam.setCurrentCam(camP);
 
   ci::gl::setMatrices(cam.getCamera());
+
+  //ci::app::console() << "Model view for right = " << ci::gl::getModelView() << "\n\n" << std::endl;
 
   ci::gl::multModelView(current_camera_pose.inverted());
 

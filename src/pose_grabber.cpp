@@ -87,17 +87,35 @@ Pose PoseGrabber::getPose(bool load_new){
     next_pose.setToIdentity();
 
     try{
-      for (int i = 0; i < 4; ++i){
-        for (int j = 0; j < 4; ++j){
+      std::string line;
+      int row = 0;
+      while (std::getline(ifs_, line))
+      {
+        if (row == 4) break;
+        if (line[0] == '#' || line.length() < 1) continue;
+        for (int col = 0; col < 4; ++col){
           float val;
           ifs_ >> val;
-          next_pose.at(i, j) = val;
+          next_pose.at(row, col) = val;
         }
+        row++;
       }
     }
     catch (std::ofstream::failure e){
       next_pose.setToIdentity();
     }
+    //try{
+    //  for (int i = 0; i < 4; ++i){
+    //    for (int j = 0; j < 4; ++j){
+    //      float val;
+    //      ifs_ >> val;
+    //      next_pose.at(i, j) = val;
+    //    }
+    //  }
+    //}
+    //catch (std::ofstream::failure e){
+    //  next_pose.setToIdentity();
+    //}
 
     gl_next_pose_ = next_pose;
     //convertFromBouguetPose(next_pose, gl_next_pose_);
@@ -146,6 +164,7 @@ Pose DaVinciPoseGrabber::getPose(bool load_new){
     }
 
     j_frames.offsets_ = offsets_;
+    j_frames.base_offsets_ = base_offsets_;
 
     GLdouble psm_transform[16];
     if (target_joint_ == davinci::PSM1)
@@ -163,10 +182,18 @@ Pose DaVinciPoseGrabber::getPose(bool load_new){
 }
 
 void DaVinciPoseGrabber::setupOffsets(int n){
+
     offsets_.reset(new std::vector<double>());
+    base_offsets_.reset(new std::vector<double>());
+
     for (int i = 0; i < n; ++i){ 
       offsets_->push_back(0); 
     }
+
+    for (int i = 0; i < 6; ++i){ //there are always 6 offsets for base
+      base_offsets_->push_back(0);
+    }
+
 }
 
 void DaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
