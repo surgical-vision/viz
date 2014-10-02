@@ -17,6 +17,9 @@ namespace viz {
     boost::shared_ptr< std::vector<double> > offsets_;
     boost::shared_ptr< std::vector<double> > base_offsets_;
 
+    std::vector<double> suj_dh_vals_;
+    std::vector<double> j_dh_vals_;
+
   };
 
 
@@ -47,6 +50,18 @@ namespace viz {
 
   };
 
+  class ArticulatedPoseGrabber : public BasePoseGrabber {
+
+  public:
+     
+    ArticulatedPoseGrabber(const std::string &infile);
+    virtual Pose getPose(bool load_new);
+
+  protected:
+    std::ifstream ifs_;
+    Pose cached_pose_;
+
+  };
   
 
 
@@ -57,8 +72,11 @@ namespace viz {
     DaVinciPoseGrabber(const std::string &in_suj_file, const std::string &in_j_file, const davinci::DaVinciJoint joint_type);
     virtual Pose getPose(bool load_new);
     void setupOffsets(int n);
+    void setOffsets(double a1, double a2, double a3, double a4, double a5, double a6, double a7);
+    void setBaseOffsets(double a1, double a2, double a3, double a4, double a5, double a6);
     boost::shared_ptr< std::vector<double> > getOffsets() { return offsets_; }
     boost::shared_ptr< std::vector<double> > getBaseOffsets() { return base_offsets_; }
+  
   protected:
 
     void convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose);

@@ -201,17 +201,17 @@ void buildKinematicChainECM1(DaVinciKinematicChain &mDaVinciChain, const API_ECM
 {
   glhSetIdentity(A);
   extendChain(mDaVinciChain.mWorldOriginSUJ3Origin[0], A);
-  extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[0], A, ecm.sj_joint_angles[0]);
-  extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[1], A, ecm.sj_joint_angles[1]);
-  extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[2], A, ecm.sj_joint_angles[2]);
-  extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[3], A, ecm.sj_joint_angles[3]);
+  extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[0], A, ecm.sj_joint_angles[0] + frames.base_offsets_->operator[](0));
+  extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[1], A, ecm.sj_joint_angles[1] + frames.base_offsets_->operator[](1));
+  extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[2], A, ecm.sj_joint_angles[2] + frames.base_offsets_->operator[](2));
+  extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[3], A, ecm.sj_joint_angles[3] + frames.base_offsets_->operator[](3));
   extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[4], A);
   extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[5], A);
   extendChain(mDaVinciChain.mSUJ3TipECM1Origin[0], A);
-  extendChain(mDaVinciChain.mECM1OriginECM1Tip[0], A, ecm.jnt_pos[0]);
-  extendChain(mDaVinciChain.mECM1OriginECM1Tip[1], A, ecm.jnt_pos[1]);
-  extendChain(mDaVinciChain.mECM1OriginECM1Tip[2], A, ecm.jnt_pos[2]);
-  extendChain(mDaVinciChain.mECM1OriginECM1Tip[3], A, ecm.jnt_pos[3]);
+  extendChain(mDaVinciChain.mECM1OriginECM1Tip[0], A, ecm.jnt_pos[0] + frames.offsets_->operator[](0));
+  extendChain(mDaVinciChain.mECM1OriginECM1Tip[1], A, ecm.jnt_pos[1] + frames.offsets_->operator[](1));
+  extendChain(mDaVinciChain.mECM1OriginECM1Tip[2], A, ecm.jnt_pos[2] + frames.offsets_->operator[](2));
+  extendChain(mDaVinciChain.mECM1OriginECM1Tip[3], A, ecm.jnt_pos[3] + frames.offsets_->operator[](3));
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[4], A);
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[5], A);
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[6], A);

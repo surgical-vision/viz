@@ -137,7 +137,6 @@ void StereoCamera::convertBouguetToDaVinciCoordinates(cv::Mat &left_camera_matri
 
 
 
-
 void StereoCamera::setupCameras(){
 
   glGetIntegerv(GL_VIEWPORT, viewport_);
@@ -181,8 +180,6 @@ void StereoCamera::moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &cur
 
   ci::gl::setMatrices(cam.getCamera());
 
-  //ci::app::console() << "Model view for left = " << ci::gl::getModelView() << "\n\n" << std::endl;
-
   left_eye_.getLight().setPosition(eye_point);
   left_eye_.getLight().lookAt(eye_point, view_direction);
  
@@ -213,8 +210,6 @@ void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &cu
   cam.setCurrentCam(camP);
 
   ci::gl::setMatrices(cam.getCamera());
-
-  //ci::app::console() << "Model view for right = " << ci::gl::getModelView() << "\n\n" << std::endl;
 
   ci::gl::multModelView(current_camera_pose.inverted());
 

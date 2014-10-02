@@ -6,6 +6,12 @@
 
 using namespace viz;
 
+inline void clean_string(std::string &str, const std::vector<char> &to_remove){
+  for (auto &ch : to_remove){
+    str.erase(std::remove(str.begin(), str.end(), ch), str.end());
+  }
+}
+
 void BasePoseGrabber::convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
 
   out_pose.setToIdentity();
@@ -34,6 +40,16 @@ PoseGrabber::PoseGrabber(const std::string &filename){
     throw std::runtime_error("Error, could not open file: " + filename);
   }
   
+  ifs_.exceptions(std::ifstream::eofbit);
+
+}
+
+ArticulatedPoseGrabber::ArticulatedPoseGrabber(const std::string &filename){
+  ifs_.open(filename);
+  if (!ifs_.is_open()){
+    throw std::runtime_error("Error, could not open file: " + filename);
+  }
+
   ifs_.exceptions(std::ifstream::eofbit);
 
 }
@@ -75,6 +91,55 @@ DaVinciPoseGrabber::DaVinciPoseGrabber(const std::string &in_suj_file, const std
 
 }
 
+Pose ArticulatedPoseGrabber::getPose(bool load_new){
+
+
+  if (load_new){
+
+    cached_pose_ = Pose();
+
+    for (int i = 0; i < 4; ++i){
+
+      ci::Matrix44f next_pose;
+      next_pose.setToIdentity();
+
+      try{
+        std::string line;
+        int row = 0;
+        while (1)
+        {
+          std::getline(ifs_, line);
+          if (row == 4) break;
+          if (line[0] == '#' || line.length() < 1) continue;
+
+          static std::vector<char> to_remove;
+          if (to_remove.size() == 0) to_remove.push_back('|');
+          clean_string(line, to_remove); 
+          std::stringstream ss(line);
+
+          for (int col = 0; col < 4; ++col){
+            float val;
+            ss >> val;
+            next_pose.at(row, col) = val;
+          }
+          row++;
+        }
+
+        cached_pose_.poses_.push_back(std::make_pair(next_pose,0));
+
+      }
+      catch (std::ofstream::failure e){
+        return Pose(ci::Matrix44f());
+      }
+
+    }
+    
+  }
+  return cached_pose_;
+
+}
+
+
 Pose PoseGrabber::getPose(bool load_new){
 
   
@@ -89,13 +154,15 @@ Pose PoseGrabber::getPose(bool load_new){
     try{
       std::string line;
       int row = 0;
-      while (std::getline(ifs_, line))
+      while (1)
       {
+        std::getline(ifs_, line);
         if (row == 4) break;
         if (line[0] == '#' || line.length() < 1) continue;
+        std::stringstream ss(line);
         for (int col = 0; col < 4; ++col){
           float val;
-          ifs_ >> val;
+          ss >> val;
           next_pose.at(row, col) = val;
         }
         row++;
@@ -146,8 +213,23 @@ Pose DaVinciPoseGrabber::getPose(bool load_new){
       ecm.jnt_pos[i] = j_joints[i];
     }
 
+    j_frames.offsets_ = offsets_;
+    j_frames.base_offsets_ = base_offsets_;
+
     GLdouble ecm_transform[16];
     buildKinematicChainECM1(chain_, ecm, ecm_transform, suj_frames, j_frames);
+
+    j_frames.suj_dh_vals_.clear();
+    j_frames.j_dh_vals_.clear();
+
+    for (std::size_t i = 0; i < suj_joints.size(); ++i){
+      j_frames.suj_dh_vals_.push_back(suj_joints[i] + (*base_offsets_)[i]);
+    }
+
+    for (std::size_t i = 0; i < j_joints.size(); ++i){
+      j_frames.j_dh_vals_.push_back(j_joints[i] + (*offsets_)[i]);
+    }
+
 
   }
 
@@ -172,6 +254,17 @@ Pose DaVinciPoseGrabber::getPose(bool load_new){
     else if (target_joint_ == davinci::PSM2)
       buildKinematicChainPSM2(chain_, psm, psm_transform, suj_frames, j_frames);
 
+    j_frames.suj_dh_vals_.clear();
+    j_frames.j_dh_vals_.clear();
+
+    for (std::size_t i = 0; i < suj_joints.size(); ++i){
+      j_frames.suj_dh_vals_.push_back(suj_joints[i] + (*base_offsets_)[i]);
+    }
+
+    for (std::size_t i = 0; i < j_joints.size(); ++i){
+      j_frames.j_dh_vals_.push_back(j_joints[i] + (*offsets_)[i]);
+    }
+
   }
 
 
@@ -179,6 +272,25 @@ Pose DaVinciPoseGrabber::getPose(bool load_new){
 
   return j_frames;
 
+}
+
+void DaVinciPoseGrabber::setOffsets(double a1, double a2, double a3, double a4, double a5, double a6, double a7){
+  (*offsets_)[0] = a1;
+  (*offsets_)[1] = a2;
+  (*offsets_)[2] = a3;
+  (*offsets_)[3] = a4;
+  (*offsets_)[4] = a5;
+  (*offsets_)[5] = a6;
+  (*offsets_)[6] = a7;
+}
+
+void DaVinciPoseGrabber::setBaseOffsets(double a1, double a2, double a3, double a4, double a5, double a6){    
+    (*base_offsets_)[0] = a1;
+    (*base_offsets_)[1] = a2;
+    (*base_offsets_)[2] = a3;
+    (*base_offsets_)[3] = a4;
+    (*base_offsets_)[4] = a5;
+    (*base_offsets_)[5] = a6;
 }
 
 void DaVinciPoseGrabber::setupOffsets(int n){
