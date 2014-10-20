@@ -34,6 +34,7 @@ void Camera::makeCurrentCamera() const {
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
+  ci::app::console() << "gl_projection = \n" << gl_projection_matrix_ << std::endl;
   glOrtho(0, image_width_, 0, image_height_, near_clip_distance_, far_clip_distance_);
   glMultMatrixf(gl_projection_matrix_.m);
 

@@ -6,11 +6,12 @@
 #include <cinder/gl/Texture.h>
 #include <cinder/gl/GlslProg.h>
 #include <cinder/MayaCamUI.h>
-#include "camera.hpp"
-#include <utils/handler.hpp>
-#include "pose_grabber.hpp"
-#include "trackable.hpp"
 #include <boost/tuple/tuple.hpp>
+
+#include "camera.hpp"
+#include "pose_grabber.hpp"
+#include "video.hpp"
+
 
 using namespace ci;
 using namespace ci::app;
@@ -34,9 +35,9 @@ namespace viz {
     void drawGrid(float size = 3.9, float step = 0.3, float plane_position = 0.0);
     void drawTarget();
     void drawEye(gl::Texture &texture, bool is_left);
-    void savePoseAsSE3(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose);
-    void savePoseAsSE3AndDH(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose);
-    void saveDH(std::ofstream &suj_ofs, std::ofstream &j_ofs, const Pose &pose);
+    //void savePoseAsSE3(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose);
+    //void savePoseAsSE3AndDH(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose);
+    //void saveDH(std::ofstream &suj_ofs, std::ofstream &j_ofs, const Pose &pose);
     void draw3D(gl::Texture &image);
     void draw2D(gl::Texture &image);
 
@@ -46,14 +47,14 @@ namespace viz {
     void drawTrajectories(std::vector<ci::Vec3f> &points_to_draw, std::vector<ci::Matrix44f> &transforms, ci::Color &color);
     void drawCameraTracker();
     
+    void loadTrackables(const ConfigReader &reader);
+
     void applyOffsetToCamera(KeyEvent &event);
-    void applyOffsetToTrackedObject(KeyEvent &event, boost::shared_ptr<DaVinciPoseGrabber> grabber);
+    void applyOffsetToTrackedObject(KeyEvent &event, boost::shared_ptr<DHDaVinciPoseGrabber> grabber);
 
-    cv::VideoWriter write_left_;
-    cv::VideoWriter write_right_;
-    //std::ofstream ofs_se3_;
-    //std::ofstream ofs_dh_;
-
+    VideoIO video_left_; 
+    VideoIO video_right_;  
+    
     StereoCamera camera_;
 
     gl::Texture left_texture_;
@@ -63,19 +64,11 @@ namespace viz {
 
     MayaCamUI maya_cam_;
     
-    boost::scoped_ptr<ttrk::Handler> handler_;
-
-    boost::scoped_ptr<Trackable> camera_pg_;
-    boost::scoped_ptr<BasePoseGrabber> camera_estimates_;
-
-    ci::Matrix44f camera_estimate_matrix_;
-    ci::Matrix44f camera_pose_;
-
+    std::vector<BasePoseGrabber> trackables_;
+    boost::scoped_ptr<PoseGrabber> moveable_camera_;
+    
     gl::GlslProg shader_;
 
-    std::vector< boost::shared_ptr<Trackable> > moving_objects_pg_;
-    
-    //std::vector< ci::Matrix44f > moving_objects_pose_;
 
     bool load_next_image_;
     bool save_next_image_;

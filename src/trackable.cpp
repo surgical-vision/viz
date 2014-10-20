@@ -3,6 +3,7 @@
 
 using namespace viz;
 
+/*
 void Trackable::setupPoseGrabber(const std::string &filename){
   pose_grabber_.reset(new PoseGrabber(filename));
 }
@@ -80,3 +81,4 @@ void Trackable::setupDaVinciPoseGrabber(const std::string &suj_file, const std::
   trackable_.reset(new ttrk::IntuitiveSurgicalLND(da_vinci_config));
 
 }
+*/

@@ -1,5 +1,6 @@
 #include <CinderOpenCV.h>
 #include <locale>
+#include <opencv2/highgui.hpp>
 
 #include "../include/config_reader.hpp"
 #include "../include/vizApp.hpp"
@@ -32,35 +33,19 @@ void vizApp::setup(){
     boost::filesystem::create_directory(reader.get_element("output"));
   }
 
-  shader_ = gl::GlslProg(loadResource(RES_SHADER_VERT), loadResource(RES_SHADER_FRAG));
+  video_left_ = VideoIO(reader.get_element("left-input-video"), reader.get_element("output-dir") + "/" + reader.get_element("left-output-video"));  
+  video_right_ = VideoIO(reader.get_element("right-input-video"), reader.get_element("output-dir") + "/" + reader.get_element("right-output-video"));
 
+  camera_.Setup(reader.get_element("root_dir") + "/" + reader.get_element("camera_config"), reader.get_element_as_int("window_width"), reader.get_element_as_int("window_height"), 1, 1000);
 
-  //open video reader
-  handler_.reset(new ttrk::StereoVideoHandler(reader.get_element("root_dir") + "/" + reader.get_element("left_input_video"), reader.get_element("root_dir") + "/" + reader.get_element("right_input_video"), ""));
-
-  //open video writer
-  write_left_.open(reader.get_element("output") + "/" + reader.get_element("left_output_video"), CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(WINDOW_WIDTH, WINDOW_HEIGHT));
-  write_right_.open(reader.get_element("output") + "/" + reader.get_element("right_output_video"), CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(WINDOW_WIDTH, WINDOW_HEIGHT));
-  if (!write_left_.isOpened() || !write_right_.isOpened()){
-    throw std::runtime_error("Error, couldn't open video file!");
+  try{
+    moveable_camera_.reset(new PoseGrabber(reader));
   }
+  catch (std::runtime_error){
 
-  camera_pg_.reset(new Trackable());
-  camera_pg_->setupDaVinciPoseGrabber(
-    reader.get_element("root_dir") + "/" + reader.get_element("camera_suj_file"),
-    reader.get_element("root_dir") + "/" + reader.get_element("camera_j_file"),
-    "",
-    reader.get_element("output") + "/" + reader.get_element("cam_suj_dh_file"),
-    reader.get_element("output") + "/" + reader.get_element("cam_j_dh_file"),
-    "",
-    reader.get_element("output") + "/" + reader.get_element("cam_se3_from_world_file"),
-    davinci::ECM);
-  camera_pg_->getDVPoseGrabber()->setupOffsets(4);
-  camera_.Setup(reader.get_element("root_dir") + "/" + reader.get_element("camera_config"), WINDOW_WIDTH, WINDOW_HEIGHT, 1, 1000);
-
-  camera_estimates_.reset(new PoseGrabber(reader.get_element("root_dir") + "/" + reader.get_element("camera_estimate_file")));
-  camera_estimate_matrix_.setToIdentity();
-
+  }
+  
+  
   moving_objects_pg_.push_back(boost::shared_ptr<Trackable>(new Trackable()));
   ci::app::console() << "FILE = " << reader.get_element("root_dir") + "/" + reader.get_element("psm2_suj_file") << std::endl;
   //moving_objects_pg_.back()->setupPoseGrabber(reader.get_element("root_dir") + "/" + reader.get_element("psm2_se3_file"), reader.get_element("output") + "/" + reader.get_element("psm2_dh_output_file"), reader.get_element("output") + "/" + reader.get_element("psm2_se3_output_file"));
@@ -97,7 +82,7 @@ void vizApp::setup(){
   moving_objects_pg_.back()->getDVPoseGrabber()->setBaseOffsets(-0.012, 0.005, 0.002, 0.004, -0.1, 0.001);
 
   moving_objects_pg_.back()->setupModel(moving_objects_pg_[0]->getTrackable());
- 
+ */
   framebuffer_ = gl::Fbo(WINDOW_WIDTH, WINDOW_HEIGHT);
   framebuffer_3d_ = gl::Fbo(500, 500);
 
@@ -126,12 +111,12 @@ void vizApp::setup(){
 void vizApp::update(){
   try{
     if (manual_control_toggle_){
-      camera_pg_->getDaVinciPose(false);
-      camera_pose_ = camera_pg_->getPose().poses_[0].first;
+      //camera_pg_->getDaVinciPose(false);
+      //camera_pose_ = camera_pg_->getPose().poses_[0].first;
     }
     else{
-      camera_pg_->getDaVinciPose(load_next_image_);
-      camera_pose_ = camera_pg_->getPose().poses_[0].first;
+      //camera_pg_->getDaVinciPose(load_next_image_);
+      //camera_pose_ = camera_pg_->getPose().poses_[0].first;
     }
   }
   catch (std::exception &){
@@ -145,7 +130,7 @@ void vizApp::update(){
     static int wait = 0;
 
     if (camera_estimates_ != 0x0)
-      camera_estimate_matrix_ = camera_estimates_->getPose(load_next_image_).poses_[0].first;
+      //camera_estimate_matrix_ = camera_estimates_->getPose(load_next_image_).poses_[0].first;
 
     //if (wait < 36 && load_next_image_){
     //  camera_estimate_matrix_.setToIdentity();
@@ -171,15 +156,15 @@ void vizApp::update(){
   }
 
   try{
-    for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
-      auto &mop = moving_objects_pg_[i];
-      if (manual_control_toggle_){
-        mop->getDaVinciPose(false);
-      }
-      else{
-         mop->getDaVinciPose(load_next_image_);
-      }
-    }
+    //for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
+      //auto &mop = moving_objects_pg_[i];
+      //if (manual_control_toggle_){
+      //  mop->getDaVinciPose(false);
+      //}
+      //else{
+      //   mop->getDaVinciPose(load_next_image_);
+      // }
+      //}
   }
   catch (std::exception &){
     std::cerr << "no more available trackable poses" << std::endl;
@@ -190,7 +175,7 @@ void vizApp::update(){
     cv::Mat stereo_image;
     
     try{
-      stereo_image = handler_->GetNewFrame();
+      //stereo_image = handler_->GetNewFrame();
     }
     catch (...){
       std::cerr << "no more available video frames" << std::endl;
@@ -504,7 +489,7 @@ void vizApp::saveFrame(gl::Texture texture, bool isLeft){
   cv::Mat frame = toOcv(texture), flipped;
   cv::flip(frame, flipped, 0);
 
-  if (isLeft){
+ /* if (isLeft){
     write_left_ << flipped;
 
     for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
@@ -522,20 +507,20 @@ void vizApp::saveFrame(gl::Texture texture, bool isLeft){
   else{
     write_right_ << flipped;
     save_next_image_ = false;
-  }
+  }*/
 
 }
 
 void vizApp::shutdown(){
 
-  for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
-    auto &pg = moving_objects_pg_[i];
-    pg->getSe3FromWorldStream().close();
-    pg->getSe3FromCamStream().close();
-    pg->getSe3AndDHStream().close();
-    pg->getSujDHStream().close();
-    pg->getJDHStream().close();
-  }
+  //for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
+  //  auto &pg = moving_objects_pg_[i];
+  //  pg->getSe3FromWorldStream().close();
+  //  pg->getSe3FromCamStream().close();
+  //  pg->getSe3AndDHStream().close();
+  //  pg->getSujDHStream().close();
+  //  pg->getJDHStream().close();
+  //}
 
   write_left_.release();
   write_right_.release();
@@ -558,36 +543,37 @@ void vizApp::drawTarget(){
  // //glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.00015f);
 
   
-  for (auto mop : moving_objects_pg_){
+  //for (auto mop : moving_objects_pg_){
 
-    const Pose pose = mop->getPose();
-    
-    auto meshes_textures_transforms = mop->getDaVinciTrackable()->GetRenderableMeshes();
+  //  const Pose pose = mop->getPose();
+  //  
+  //  auto meshes_textures_transforms = mop->getDaVinciTrackable()->GetRenderableMeshes();
 
-    for (std::size_t i = 0; i < meshes_textures_transforms.size(); ++i){
+  //  for (std::size_t i = 0; i < meshes_textures_transforms.size(); ++i){
 
-      if ((!draw2 && i == 2) || (!draw3 && i == 3)){
-        continue;
-      }
+  //    if ((!draw2 && i == 2) || (!draw3 && i == 3)){
+  //      continue;
+  //    }
 
-      shader_.bind();
-      //shader_.uniform("NumEnabledLights", 1);        
+  //    //shader_.bind();
+  //    //shader_.uniform("NumEnabledLights", 1);        
 
-      gl::pushModelView();
-      const auto &mesh = meshes_textures_transforms[i].get<0>();
-      const auto &texture = meshes_textures_transforms[i].get<1>();
+  //    gl::pushModelView();
+  //    const auto &mesh = meshes_textures_transforms[i].get<0>();
+  //    const auto &texture = meshes_textures_transforms[i].get<1>();
 
-      gl::multModelView(pose.poses_[i].first); //multiply by the pose of this tracked object
-      //gl::multModelView(transform);
+  //    gl::multModelView(pose.poses_[i].first); //multiply by the pose of this tracked object
+  //    ci::app::console() << "Model view = \n" << gl::getModelView() << std::endl;
+  //    //gl::multModelView(transform);
 
-      gl::draw(*mesh);
+  //    gl::draw(*mesh);
 
-      shader_.unbind();
-      gl::popModelView();
+  //    //shader_.unbind();
+  //    gl::popModelView();
 
-    }  
+  //  }  
 
-  }
+  //}
 
 
   glDisable(GL_LIGHTING);
@@ -625,6 +611,7 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
     camera_.makeRightEyeCurrent();
   }
 
+  ci::app::console() << "GL_PROJECTION = \n" << ci::gl::getProjection() << std::endl;
   
   drawTarget();
   
@@ -633,6 +620,25 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
   gl::popMatrices(); 
 
   camera_.unsetCameras(); //reset the viewport values
+
+}
+
+void vizApp::loadTrackables(const ConfigReader &reader){
+
+  for (int i = 0;; ++i){
+
+    try{
+
+      std::stringstream s("trackable-"); 
+      s << i;
+      loadTrackable(s.str());
+
+    }
+    catch (std::runtime_error){
+      break;
+    }
+
+  }
 
 }
 
@@ -675,45 +681,45 @@ inline void writePose(std::ofstream &ofs, const std::string &title, const ci::Ma
 
 }
 
-void vizApp::saveDH(std::ofstream &suj_ofs, std::ofstream &j_ofs, const Pose &pose){
+//void vizApp::saveDH(std::ofstream &suj_ofs, std::ofstream &j_ofs, const Pose &pose){
 
-  for (auto &j_dh : pose.j_dh_vals_){
-    j_ofs << j_dh << "\n";
-  }
-  j_ofs << "\n";
+  //for (auto &j_dh : pose.j_dh_vals_){
+  //  j_ofs << j_dh << "\n";
+  //}
+  //j_ofs << "\n";
 
-  for (auto &suj_dh : pose.suj_dh_vals_){
-    suj_ofs << suj_dh << "\n";
-  }
-  suj_ofs << "\n";
+  //for (auto &suj_dh : pose.suj_dh_vals_){
+  //  suj_ofs << suj_dh << "\n";
+  //}
+  //suj_ofs << "\n";
 
-}
+//}
 
-void vizApp::savePoseAsSE3(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose){
+//void vizApp::savePoseAsSE3(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose){
 
-  if (pose.poses_.size() != 4 && pose.poses_.size() != 1){
-    throw std::runtime_error("Error, there should be 4 poses to call this function");
-  }
+  //if (pose.poses_.size() != 4 && pose.poses_.size() != 1){
+  //  throw std::runtime_error("Error, there should be 4 poses to call this function");
+  //}
 
-  if (pose.poses_.size() == 1){
-    writePose(ofs, "World to camera transform", pose.poses_[0].first, camera_pose.poses_[0].first);
-  }
-  else{
-   
-    writePose(ofs, "Transform to body", pose.poses_[0].first, camera_pose.poses_[0].first);
+  //if (pose.poses_.size() == 1){
+  //  writePose(ofs, "World to camera transform", pose.poses_[0].first, camera_pose.poses_[0].first);
+  //}
+  //else{
+  // 
+  //  writePose(ofs, "Transform to body", pose.poses_[0].first, camera_pose.poses_[0].first);
 
-    writePose(ofs, "Transform to wrist", pose.poses_[1].first, camera_pose.poses_[0].first);
+  //  writePose(ofs, "Transform to wrist", pose.poses_[1].first, camera_pose.poses_[0].first);
 
-    writePose(ofs, "Transform to clasper 1", pose.poses_[2].first, camera_pose.poses_[0].first);
+  //  writePose(ofs, "Transform to clasper 1", pose.poses_[2].first, camera_pose.poses_[0].first);
 
-    writePose(ofs, "Transform to clasper 2", pose.poses_[3].first, camera_pose.poses_[0].first);
-  }
+  //  writePose(ofs, "Transform to clasper 2", pose.poses_[3].first, camera_pose.poses_[0].first);
+  //}
 
-}
+//}
 
-void vizApp::savePoseAsSE3AndDH(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose){
+//void vizApp::savePoseAsSE3AndDH(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose){
 
-  if (pose.poses_.size() != 4){
+ /* if (pose.poses_.size() != 4){
     throw std::runtime_error("Error, there should be 4 poses to call this function");
   }
 
@@ -731,8 +737,8 @@ void vizApp::savePoseAsSE3AndDH(std::ofstream &ofs, const Pose &camera_pose, con
 
   ofs << "# DH parameter from wrist to clasper 2 \n";
   ofs << pose.poses_[3].second;
-  ofs << "\n\n";
-}
+  ofs << "\n\n";*/
+//}
 
 void vizApp::mouseDrag(MouseEvent event){
   // let the camera handle the interaction
@@ -782,34 +788,34 @@ void vizApp::keyDown(KeyEvent event){
   }
 
 
-  if (current_model_idx == 0){
-    applyOffsetToCamera(event);
-  }
-  else{
-    if (current_model_idx - 1 >= moving_objects_pg_.size()){
-      console() << "Error, this index is too large for the vector!" << std::endl;
-      return;
-    }
-    boost::shared_ptr< DaVinciPoseGrabber > grabber;
-    try{
-      grabber = moving_objects_pg_[current_model_idx-1]->getDVPoseGrabber();
-      if (grabber.get() == 0x0) return;
-      applyOffsetToTrackedObject(event, grabber);
+  //if (current_model_idx == 0){
+  //  applyOffsetToCamera(event);
+  //}
+  //else{
+  //  if (current_model_idx - 1 >= moving_objects_pg_.size()){
+  //    console() << "Error, this index is too large for the vector!" << std::endl;
+  //    return;
+  //  }
+  //  boost::shared_ptr< DaVinciPoseGrabber > grabber;
+  //  try{
+  //    grabber = moving_objects_pg_[current_model_idx-1]->getDVPoseGrabber();
+  //    if (grabber.get() == 0x0) return;
+  //    applyOffsetToTrackedObject(event, grabber);
 
-    }
-    catch (...){
-      return;
-    }
+  //  }
+  //  catch (...){
+  //    return;
+  //  }
 
 
-  }
-   
+  //}
+  // 
 
 }
 
 void vizApp::applyOffsetToCamera(KeyEvent &event){
 
-  boost::shared_ptr<std::vector<double> > offsets = camera_pg_->getDVPoseGrabber()->getOffsets();
+  /*boost::shared_ptr<std::vector<double> > offsets = camera_pg_->getDVPoseGrabber()->getOffsets();
   boost::shared_ptr<std::vector<double> > base_offsets = camera_pg_->getDVPoseGrabber()->getBaseOffsets();
 
   double suj_offset = 0.004;
@@ -902,121 +908,119 @@ void vizApp::applyOffsetToCamera(KeyEvent &event){
     }
     ci::app::console() << "]" << std::endl;
   }
-
+  */
 }
 
-void vizApp::applyOffsetToTrackedObject(KeyEvent &event, boost::shared_ptr<DaVinciPoseGrabber> grabber){
-
-  boost::shared_ptr<std::vector<double> > offsets = grabber->getOffsets();
-  boost::shared_ptr<std::vector<double> > base_offsets = grabber->getBaseOffsets();
-
-  if (offsets->size() == 0)
-    return;
-
-  double suj_offset = 0.004;
-  double j_offset = 0.001;
-  if (manual_control_toggle_){
-    suj_offset = 0.001;
-    j_offset = 0.0004;
-  }
-
-  if (event.getChar() == 'q'){
-    (*offsets)[0] += suj_offset;
-  }
-  else if (event.getChar() == 'w'){
-    (*offsets)[1] += suj_offset;
-  }
-  else if (event.getChar() == 'e'){
-    (*offsets)[2] += suj_offset;
-  }
-  else if (event.getChar() == 'r'){
-    (*offsets)[3] += suj_offset;
-  }
-  else if (event.getChar() == 't'){
-    (*offsets)[4] += suj_offset;
-  }
-  else if (event.getChar() == 'y'){
-    (*offsets)[5] += suj_offset;
-  }
-  else if (event.getChar() == 'u'){
-    (*offsets)[6] += suj_offset;
-  }
-
-  else if (event.getChar() == 'z'){
-    (*offsets)[0] -= suj_offset;
-  }
-  else if (event.getChar() == 'x'){
-    (*offsets)[1] -= suj_offset;
-  }
-  else if (event.getChar() == 'c'){
-    (*offsets)[2] -= suj_offset;
-  }
-  else if (event.getChar() == 'v'){
-    (*offsets)[3] -= suj_offset;
-  }
-  else if (event.getChar() == 'b'){
-    (*offsets)[4] -= suj_offset;
-  }
-  else if (event.getChar() == 'n'){
-    (*offsets)[5] -= suj_offset;
-  }
-  else if (event.getChar() == 'm'){
-    (*offsets)[6] -= suj_offset;
-  }
-
-  if (event.getChar() == 'Q'){
-    (*base_offsets)[0] += j_offset;
-  }
-  else if (event.getChar() == 'W'){
-    (*base_offsets)[1] += j_offset;
-  }
-  else if (event.getChar() == 'E'){
-    (*base_offsets)[2] += j_offset;
-  }
-  else if (event.getChar() == 'R'){
-    (*base_offsets)[3] += j_offset;
-  }
-  else if (event.getChar() == 'T'){
-    (*base_offsets)[4] += j_offset;
-  }
-  else if (event.getChar() == 'Y'){
-    (*base_offsets)[5] += j_offset;
-  }
-
-  else if (event.getChar() == 'Z'){
-    (*base_offsets)[0] -= j_offset;
-  }
-  else if (event.getChar() == 'X'){
-    (*base_offsets)[1] -= j_offset;
-  }
-  else if (event.getChar() == 'C'){
-    (*base_offsets)[2] -= j_offset;
-  }
-  else if (event.getChar() == 'V'){
-    (*base_offsets)[3] -= j_offset;
-  }
-  else if (event.getChar() == 'B'){
-    (*base_offsets)[4] -= j_offset;
-  }
-  else if (event.getChar() == 'N'){
-    (*base_offsets)[5] -= j_offset;
-  }
-
-
-
-  if (offsets != nullptr){
-    ci::app::console() << "Offset = [ ";
-    for (auto i : *offsets){
-      ci::app::console() << i << ", ";
-    }
-    ci::app::console() << "]" << std::endl;
-
-    ci::app::console() << "Base Offset = [ ";
-    for (auto i : *base_offsets){
-      ci::app::console() << i << ", ";
-    }
-    ci::app::console() << "]" << std::endl;
-  }
-}
-
-CINDER_APP_NATIVE( vizApp, RendererGl )
+//void vizApp::applyOffsetToTrackedObject(KeyEvent &event, boost::shared_ptr<DaVinciPoseGrabber> grabber){
+//
+//  boost::shared_ptr<std::vector<double> > offsets = grabber->getOffsets();
+//  boost::shared_ptr<std::vector<double> > base_offsets = grabber->getBaseOffsets();
+//
+//  if (offsets->size() == 0)
+//    return;
+//
+//  double suj_offset = 0.004;
+//  double j_offset = 0.001;
+//  if (manual_control_toggle_){
+//    suj_offset = 0.001;
+//    j_offset = 0.0004;
+//  }
+//
+//  if (event.getChar() == 'q'){
+//    (*offsets)[0] += suj_offset;
+//  }
+//  else if (event.getChar() == 'w'){
+//    (*offsets)[1] += suj_offset;
+//  }
+//  else if (event.getChar() == 'e'){
+//    (*offsets)[2] += suj_offset;
+//  }
+//  else if (event.getChar() == 'r'){
+//    (*offsets)[3] += suj_offset;
+//  }
+//  else if (event.getChar() == 't'){
+//    (*offsets)[4] += suj_offset;
+//  }
+//  else if (event.getChar() == 'y'){
+//    (*offsets)[5] += suj_offset;
+//  }
+//  else if (event.getChar() == 'u'){
+//    (*offsets)[6] += suj_offset;
+//  }
+//
+//  else if (event.getChar() == 'z'){
+//    (*offsets)[0] -= suj_offset;
+//  }
+//  else if (event.getChar() == 'x'){
+//    (*offsets)[1] -= suj_offset;
+//  }
+//  else if (event.getChar() == 'c'){
+//    (*offsets)[2] -= suj_offset;
+//  }
+//  else if (event.getChar() == 'v'){
+//    (*offsets)[3] -= suj_offset;
+//  }
+//  else if (event.getChar() == 'b'){
+//    (*offsets)[4] -= suj_offset;
+//  }
+//  else if (event.getChar() == 'n'){
+//    (*offsets)[5] -= suj_offset;
+//  }
+//  else if (event.getChar() == 'm'){
+//    (*offsets)[6] -= suj_offset;
+//  }
+//
+//  if (event.getChar() == 'Q'){
+//    (*base_offsets)[0] += j_offset;
+//  }
+//  else if (event.getChar() == 'W'){
+//    (*base_offsets)[1] += j_offset;
+//  }
+//  else if (event.getChar() == 'E'){
+//    (*base_offsets)[2] += j_offset;
+//  }
+//  else if (event.getChar() == 'R'){
+//    (*base_offsets)[3] += j_offset;
+//  }
+//  else if (event.getChar() == 'T'){
+//    (*base_offsets)[4] += j_offset;
+//  }
+//  else if (event.getChar() == 'Y'){
+//    (*base_offsets)[5] += j_offset;
+//  }
+//
+//  else if (event.getChar() == 'Z'){
+//    (*base_offsets)[0] -= j_offset;
+//  }
+//  else if (event.getChar() == 'X'){
+//    (*base_offsets)[1] -= j_offset;
+//  }
+//  else if (event.getChar() == 'C'){
+//    (*base_offsets)[2] -= j_offset;
+//  }
+//  else if (event.getChar() == 'V'){
+//    (*base_offsets)[3] -= j_offset;
+//  }
+//  else if (event.getChar() == 'B'){
+//    (*base_offsets)[4] -= j_offset;
+//  }
+//  else if (event.getChar() == 'N'){
+//    (*base_offsets)[5] -= j_offset;
+//  }
+//
+//
+//
+//  if (offsets != nullptr){
+//    ci::app::console() << "Offset = [ ";
+//    for (auto i : *offsets){
+//      ci::app::console() << i << ", ";
+//    }
+//    ci::app::console() << "]" << std::endl;
+//
+//    ci::app::console() << "Base Offset = [ ";
+//    for (auto i : *base_offsets){
+//      ci::app::console() << i << ", ";
+//    }
+//    ci::app::console() << "]" << std::endl;
+//  }
+//}

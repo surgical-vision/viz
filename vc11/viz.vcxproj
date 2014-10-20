@@ -108,11 +108,13 @@
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention />
       <TargetMachine>MachineX86</TargetMachine>
+      <ShowProgress>LinkVerbose</ShowProgress>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\camera.cpp" />
     <ClCompile Include="..\src\davinci.cpp" />
+    <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\pose_grabber.cpp" />
     <ClCompile Include="..\src\snippets.cpp" />
     <ClCompile Include="..\src\trackable.cpp" />

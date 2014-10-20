@@ -2,7 +2,7 @@
 
 #include <string>
 #include <boost/scoped_ptr.hpp>
-#include <track/model/articulated_model.hpp>
+
 #include "pose_grabber.hpp"
 
 namespace viz {
@@ -11,6 +11,7 @@ namespace viz {
    * Combines a pose grabber with a mesh/model
    */
 
+  /*
   class Trackable {
 
 
@@ -57,7 +58,7 @@ namespace viz {
     
 
   };
-
+  */
 
 
 

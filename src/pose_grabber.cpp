@@ -1,8 +1,10 @@
-#include "../include/pose_grabber.hpp"
 #include <cinder/Quaternion.h>
 #include <cinder/app/App.h>
+
 #include "api_stream.h"
 #include "snippets.hpp"
+#include "../include/pose_grabber.hpp"
+
 
 using namespace viz;
 
@@ -33,287 +35,65 @@ void BasePoseGrabber::convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::M
 
 }
 
-PoseGrabber::PoseGrabber(const std::string &filename){
+PoseGrabber::PoseGrabber(const ConfigReader &reader){
 
-  ifs_.open(filename);
+  model_.LoadData(reader.get_element("model-file"));
+  ifs_.open(reader.get_element("pose-file"));
+
   if (!ifs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + filename);
-  }
-  
-  ifs_.exceptions(std::ifstream::eofbit);
-
-}
-
-ArticulatedPoseGrabber::ArticulatedPoseGrabber(const std::string &filename){
-  ifs_.open(filename);
-  if (!ifs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + filename);
+    throw std::runtime_error("Error, could not open file: " + reader.get_element("pose-file"));
   }
 
   ifs_.exceptions(std::ifstream::eofbit);
 
 }
 
-DaVinciPoseGrabber::DaVinciPoseGrabber(const std::string &in_suj_file, const std::string &in_j_file, const davinci::DaVinciJoint joint_type){
+void PoseGrabber::LoadPose(){
 
-  target_joint_ = joint_type;
+  ci::Matrix44f next_pose;
 
-  switch (target_joint_){
+  next_pose.setToIdentity();
+  do_draw_ = false; //set to true only if we read a 'good' pose
 
-  case davinci::DaVinciJoint::PSM1:
-    num_suj_joints_ = chain_.mSUJ1OriginSUJ1Tip.size();
-    num_j_joints_ = chain_.mPSM1OriginPSM1Tip.size();
-    break;
-  case davinci::DaVinciJoint::PSM2:
-    num_suj_joints_ = chain_.mSUJ2OriginSUJ2Tip.size();
-    num_j_joints_ = chain_.mPSM2OriginPSM2Tip.size();
-    break;
-  case davinci::DaVinciJoint::ECM:
-    num_suj_joints_ = chain_.mSUJ3OriginSUJ3Tip.size();
-    num_j_joints_ = 4;//chain_.mECM1OriginECM1Tip.size(); //alhtough this value is 4 in the file in pratt's code it is 7
-    break;
-
-  }
-
-  suj_ifs_.open(in_suj_file);
-  if (!suj_ifs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + in_suj_file);
-  }
-
-  suj_ifs_.exceptions(std::ifstream::eofbit);
-
-  j_ifs_.open(in_j_file);
-  if (!j_ifs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + in_j_file);
-  }
-
-  j_ifs_.exceptions(std::ifstream::eofbit);
-
-}
-
-Pose ArticulatedPoseGrabber::getPose(bool load_new){
-
-
-  if (load_new){
-
-    cached_pose_ = Pose();
-
-    for (int i = 0; i < 4; ++i){
-
-      ci::Matrix44f next_pose;
-      next_pose.setToIdentity();
-
-      try{
-        std::string line;
-        int row = 0;
-        while (1)
-        {
-          std::getline(ifs_, line);
-          if (row == 4) break;
-          if (line[0] == '#' || line.length() < 1) continue;
-
-          static std::vector<char> to_remove;
-          if (to_remove.size() == 0) to_remove.push_back('|');
-          clean_string(line, to_remove); 
-          std::stringstream ss(line);
-
-          for (int col = 0; col < 4; ++col){
-            float val;
-            ss >> val;
-            next_pose.at(row, col) = val;
-          }
-          row++;
-        }
-
-        cached_pose_.poses_.push_back(std::make_pair(next_pose,0));
-
+  try{
+    std::string line;
+    int row = 0;
+    while (1)
+    {
+      std::getline(ifs_, line);
+      if (row == 4) break;
+      if (line[0] == '#' || line.length() < 1) continue;
+      std::stringstream ss(line);
+      for (int col = 0; col < 4; ++col){
+        float val;
+        ss >> val;
+        next_pose.at(row, col) = val;
       }
-      catch (std::ofstream::failure e){
-        return Pose(ci::Matrix44f());
-      }
-
+      row++;
     }
-    
+    do_draw_ = true;
   }
-  return cached_pose_;
-
-}
-
-
-Pose PoseGrabber::getPose(bool load_new){
-
-  
-  if (load_new){
-
-    gl_next_pose_.setToIdentity();
-
-    ci::Matrix44f next_pose;
-
+  catch (std::ofstream::failure e){
     next_pose.setToIdentity();
-
-    try{
-      std::string line;
-      int row = 0;
-      while (1)
-      {
-        std::getline(ifs_, line);
-        if (row == 4) break;
-        if (line[0] == '#' || line.length() < 1) continue;
-        std::stringstream ss(line);
-        for (int col = 0; col < 4; ++col){
-          float val;
-          ss >> val;
-          next_pose.at(row, col) = val;
-        }
-        row++;
-      }
-    }
-    catch (std::ofstream::failure e){
-      next_pose.setToIdentity();
-    }
-    //try{
-    //  for (int i = 0; i < 4; ++i){
-    //    for (int j = 0; j < 4; ++j){
-    //      float val;
-    //      ifs_ >> val;
-    //      next_pose.at(i, j) = val;
-    //    }
-    //  }
-    //}
-    //catch (std::ofstream::failure e){
-    //  next_pose.setToIdentity();
-    //}
-
-    gl_next_pose_ = next_pose;
-    //convertFromBouguetPose(next_pose, gl_next_pose_);
-
-  }
-  return Pose(gl_next_pose_);
-
-}
-
-Pose DaVinciPoseGrabber::getPose(bool load_new){
-
-  if (load_new){
-    suj_joints.clear();
-    j_joints.clear();
-    ReadDHFromFiles(suj_joints, j_joints);
+    do_draw_ = false;
   }
 
-  Pose suj_frames, j_frames;
-
-  if (target_joint_ == davinci::ECM){
-    API_ECM ecm;
-
-    for (std::size_t i = 0; i < suj_joints.size(); ++i){
-      ecm.sj_joint_angles[i] = suj_joints[i];
-    }
-
-    for (std::size_t i = 0; i < j_joints.size(); ++i){
-      ecm.jnt_pos[i] = j_joints[i];
-    }
-
-    j_frames.offsets_ = offsets_;
-    j_frames.base_offsets_ = base_offsets_;
-
-    GLdouble ecm_transform[16];
-    buildKinematicChainECM1(chain_, ecm, ecm_transform, suj_frames, j_frames);
-
-    j_frames.suj_dh_vals_.clear();
-    j_frames.j_dh_vals_.clear();
-
-    for (std::size_t i = 0; i < suj_joints.size(); ++i){
-      j_frames.suj_dh_vals_.push_back(suj_joints[i] + (*base_offsets_)[i]);
-    }
-
-    for (std::size_t i = 0; i < j_joints.size(); ++i){
-      j_frames.j_dh_vals_.push_back(j_joints[i] + (*offsets_)[i]);
-    }
-
-
-  }
-
-  else if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
-
-    API_PSM psm;
-
-    for (std::size_t i = 0; i < suj_joints.size(); ++i){
-      psm.sj_joint_angles[i] = suj_joints[i];
-    }
-
-    for (std::size_t i = 0; i < j_joints.size(); ++i){
-      psm.jnt_pos[i] = j_joints[i];
-    }
-
-    j_frames.offsets_ = offsets_;
-    j_frames.base_offsets_ = base_offsets_;
-
-    GLdouble psm_transform[16];
-    if (target_joint_ == davinci::PSM1)
-      buildKinematicChainPSM1(chain_, psm, psm_transform, suj_frames, j_frames);
-    else if (target_joint_ == davinci::PSM2)
-      buildKinematicChainPSM2(chain_, psm, psm_transform, suj_frames, j_frames);
-
-    j_frames.suj_dh_vals_.clear();
-    j_frames.j_dh_vals_.clear();
-
-    for (std::size_t i = 0; i < suj_joints.size(); ++i){
-      j_frames.suj_dh_vals_.push_back(suj_joints[i] + (*base_offsets_)[i]);
-    }
-
-    for (std::size_t i = 0; i < j_joints.size(); ++i){
-      j_frames.j_dh_vals_.push_back(j_joints[i] + (*offsets_)[i]);
-    }
-
-  }
-
-
-  //translate then rotate gives the same results
-
-  return j_frames;
+  std::vector<ci::Matrix44f> ret({ next_pose });
+  model_.SetTransformSet(ret);
 
 }
 
-void DaVinciPoseGrabber::setOffsets(double a1, double a2, double a3, double a4, double a5, double a6, double a7){
-  (*offsets_)[0] = a1;
-  (*offsets_)[1] = a2;
-  (*offsets_)[2] = a3;
-  (*offsets_)[3] = a4;
-  (*offsets_)[4] = a5;
-  (*offsets_)[5] = a6;
-  (*offsets_)[6] = a7;
-}
-
-void DaVinciPoseGrabber::setBaseOffsets(double a1, double a2, double a3, double a4, double a5, double a6){    
-    (*base_offsets_)[0] = a1;
-    (*base_offsets_)[1] = a2;
-    (*base_offsets_)[2] = a3;
-    (*base_offsets_)[3] = a4;
-    (*base_offsets_)[4] = a5;
-    (*base_offsets_)[5] = a6;
-}
-
-void DaVinciPoseGrabber::setupOffsets(int n){
-
-    offsets_.reset(new std::vector<double>());
-    base_offsets_.reset(new std::vector<double>());
-
-    for (int i = 0; i < n; ++i){ 
-      offsets_->push_back(0); 
-    }
-
-    for (int i = 0; i < 6; ++i){ //there are always 6 offsets for base
-      base_offsets_->push_back(0);
-    }
-
-}
-
-void DaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
-
+BaseDaVinciPoseGrabber::BaseDaVinciPoseGrabber(const ConfigReader &reader){
   
+  model_.LoadData(reader.get_element("model-file"));
+
+}
+
+void BaseDaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
+
 
   out_pose.setToIdentity();
-  
+
   ci::Matrix44f flip;
   flip.setToIdentity();
   flip.at(1, 1) *= -1;
@@ -323,49 +103,189 @@ void DaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci
 
   out_pose = in_pose * flip;
 
-  //ci::Quatf q(flip);
-  //out_pose.rotate(q.getAxis(), q.getAngle());
+}
 
-  //ci::Vec3f translation = in_pose.getTranslate().xyz();
-  //out_pose.translate(translation);
-  
-  //ci::Matrix33f in_gl_coords = in_pose.subMatrix33(0, 0);
-  //ci::Quatf q2(in_gl_coords);
-  //out_pose.rotate(q2.getAxis(), q2.getAngle());
+DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaVinciPoseGrabber(reader) {
 
-  //ci::Vec3f translation = in_pose.getTranslate().xyz();
-  //translation[0] *= -1;
-  //translation[2] *= -1;
-  //out_pose.translate(translation);
+  if (reader.get_element("joint") == "PSM1")
+    target_joint_ = davinci::DaVinciJoint::PSM1;
+  else if (reader.get_element("joint") == "PSM2")
+    target_joint_ = davinci::DaVinciJoint::PSM2;
+  else if (reader.get_element("joint") == "ECM")
+    target_joint_ = davinci::DaVinciJoint::ECM;
+  else
+    throw std::runtime_error("Error, bad joint");
 
-  //ci::Matrix33f flip;
-  //flip.setToIdentity();
-  //flip.at(0, 0) *= -1;
-  //flip.at(2, 2) *= -1;
-  //ci::Matrix33f in_gl_coords = flip * in_pose.subMatrix33(0, 0);
-  //ci::Quatf q(in_gl_coords);
-  //out_pose.rotate(q.getAxis(), q.getAngle());
+  switch (target_joint_){
+
+  case davinci::DaVinciJoint::PSM1:
+    num_base_joints_ = chain_.mSUJ1OriginSUJ1Tip.size();
+    num_arm_joints_ = chain_.mPSM1OriginPSM1Tip.size();
+    break;
+  case davinci::DaVinciJoint::PSM2:
+    num_base_joints_ = chain_.mSUJ2OriginSUJ2Tip.size();
+    num_arm_joints_ = chain_.mPSM2OriginPSM2Tip.size();
+    break;
+  case davinci::DaVinciJoint::ECM:
+    num_base_joints_ = chain_.mSUJ3OriginSUJ3Tip.size();
+    num_arm_joints_ = 4;//chain_.mECM1OriginECM1Tip.size(); //alhtough this value is 4 in the file in pratt's code it is 7
+    break;
+  }
+
+  base_ifs_.open(reader.get_element("base-joint-file"));
+  if (!base_ifs_.is_open()){
+    throw std::runtime_error("Error, could not open file: " + reader.get_element("base-joint-file"));
+  }
+
+  base_ifs_.exceptions(std::ifstream::eofbit);
+
+  arm_ifs_.open(reader.get_element("arm-joint-file"));
+  if (!arm_ifs_.is_open()){
+    throw std::runtime_error("Error, could not open file: " + reader.get_element("arm-joint-file"));
+  }
+
+  arm_ifs_.exceptions(std::ifstream::eofbit);
+
+  model_.LoadData(reader.get_element("model-file"));
 
 }
 
-void DaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_suj_joints, std::vector<double> &psm_joints){
+void DHDaVinciPoseGrabber::LoadPose(){
 
-  try{
-    for (int i = 0; i < num_j_joints_; ++i){
-      double x;
-      j_ifs_ >> x;
-      psm_joints.push_back(x);
+  std::vector<double> base_joints, arm_joints;
+  
+  if(!ReadDHFromFiles(base_joints, arm_joints))
+    return;
+
+  if (target_joint_ == davinci::ECM){
+    
+    API_ECM ecm;
+
+    for (std::size_t i = 0; i < base_joints.size(); ++i){
+      ecm.sj_joint_angles[i] = base_joints[i] + base_offsets_[i];
     }
 
-    for (int i = 0; i < num_suj_joints_; ++i){
+    for (std::size_t i = 0; i < arm_joints.size(); ++i){
+      ecm.jnt_pos[i] = arm_joints[i] + arm_offsets_[i];
+    }
+    
+    buildKinematicChainECM1(chain_, ecm, model_.Shaft().transform_);
+
+  }
+
+  else if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
+
+    API_PSM psm;
+
+    for (std::size_t i = 0; i < base_joints.size(); ++i){
+      psm.sj_joint_angles[i] = base_joints[i] + base_offsets_[i];
+    }
+
+    for (std::size_t i = 0; i < arm_joints.size(); ++i){
+      psm.jnt_pos[i] = arm_joints[i] + arm_offsets_[i];
+    }
+
+    if (target_joint_ == davinci::PSM1)
+      buildKinematicChainPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+    else if (target_joint_ == davinci::PSM2)
+      buildKinematicChainPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+
+  }
+
+}
+
+bool DHDaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_base_joints, std::vector<double> &psm_arm_joints){
+
+  try{
+    for (int i = 0; i < num_arm_joints_; ++i){
       double x;
-      suj_ifs_ >> x;
-      psm_suj_joints.push_back(x);
+      arm_ifs_ >> x;
+      psm_arm_joints.push_back(x);
+    }
+
+    for (int i = 0; i < num_base_joints_; ++i){
+      double x;
+      base_ifs_ >> x;
+      psm_base_joints.push_back(x);
     }
 
   }
   catch (std::ifstream::failure){
-    exit(0);
+    do_draw_ = false;
+    return false;
   }
+
+  return true;
+
+}
+
+SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader) : BaseDaVinciPoseGrabber(reader) {
+
+  if (reader.get_element("joint") == "PSM1")
+    target_joint_ = davinci::DaVinciJoint::PSM1;
+  else if (reader.get_element("joint") == "PSM2")
+    target_joint_ = davinci::DaVinciJoint::PSM2;
+  else if (reader.get_element("joint") == "ECM")
+    target_joint_ = davinci::DaVinciJoint::ECM;
+  else
+    throw std::runtime_error("Error, bad joint");
+
+  ifs_.open(reader.get_element("pose-file"));
+
+  num_wrist_joints_ = 3; //should this load from config file?
+
+}
+
+void SE3DaVinciPoseGrabber::LoadPose(){
+  
+  ci::Matrix44f next_pose;
+  next_pose.setToIdentity();
+  std::vector<double> wrist_joints;
+
+  do_draw_ = false; //set to true only if we read a 'good' pose
+
+  try{
+    std::string line;
+    int row = 0;
+    while (1)
+    {
+      std::getline(ifs_, line);
+      if (row == 4) break;
+      if (line[0] == '#' || line.length() < 1) continue;
+      std::stringstream ss(line);
+      for (int col = 0; col < 4; ++col){
+        float val;
+        ss >> val;
+        next_pose.at(row, col) = val;
+      }
+      row++;
+    }
+    do_draw_ = true;
+
+    for (int i = 0; i < num_wrist_joints_; ++i){
+      double x;
+      ifs_ >> x;
+      wrist_joints.push_back(x);
+    }
+
+  }
+  catch (std::ofstream::failure e){
+    next_pose.setToIdentity();
+    do_draw_ = false;
+  }
+
+  if (do_draw_ == false) return;
+
+  model_.Shaft().transform_ = next_pose;
+
+  API_PSM psm;
+  for (size_t i = 0; i < wrist_joints.size(); ++i){
+    psm.jnt_pos[i] = wrist_joints[i];
+  }
+
+  if (target_joint_ == davinci::PSM1)
+    buildKinematicChainAtEndPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+  else if (target_joint_ == davinci::PSM2)
+    buildKinematicChainAtEndPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
 
 }

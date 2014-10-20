@@ -11,6 +11,7 @@ namespace viz {
   class ConfigReader {
 
   public:
+
     explicit ConfigReader(const std::string &config_file){
 
       std::ifstream ifs(config_file);
@@ -29,34 +30,49 @@ namespace viz {
       }
     }
 
-    void remove_carriage_return(std::string& line)
-    {
+    void remove_carriage_return(std::string& line) const {
       if (*line.rbegin() == '\r')
       {
         line.erase(line.length() - 1);
       }
     }
 
-    std::string get_element(const std::string &key){
+    std::string get_element(const std::string &key) const {
 
       if (config_.count(key) == 0){
         throw std::runtime_error("Couldn't find key!");
       }
       else{
-        return config_[key];
+        std::map<std::string, std::string>::const_iterator it = config_.find(key);
+        return it->second;
+      }
+
+    }
+
+    int get_element_as_int(const std::string &key) const {
+
+      if (config_.count(key) == 0){
+        throw std::runtime_error("Couldn't find key!");
+      }
+      else{
+        std::map<std::string, std::string>::const_iterator it = config_.find(key);
+        std::stringstream s(it->second);
+        int x;
+        s >> x;
+        return x;
       }
 
     }
 
   protected:
 
-    std::vector<std::string> split(const std::string &s, char delim) {
+    std::vector<std::string> split(const std::string &s, char delim) const {
       std::vector<std::string> elems;
       split(s, delim, elems);
       return elems;
     }
 
-    std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
+    std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) const {
       std::stringstream ss(s);
       std::string item;
       while (std::getline(ss, item, delim)) {
