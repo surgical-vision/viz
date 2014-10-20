@@ -29,9 +29,17 @@ namespace viz {
     
     /**
     * Load the next pose value from the file. This changes the class' internal representation of its pose when it renders the model.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
+    * UI to account for a rigid offset.
     */
-    virtual void LoadPose() = 0;
+    virtual void LoadPose(const bool no_reload) = 0;
     
+    /**
+    * Return the current pose estimate.
+    * @return Return the current pose estimate.
+    */
+    virtual ci::Matrix44f GetPose() = 0;
+
     /**
     * Destructor.
     */
@@ -50,8 +58,22 @@ namespace viz {
     */
     virtual std::string writePoseToString(const ci::Matrix44f &camera_pose) const = 0;
 
+    /**
+    * Get the poses from the previous frames to draw past trajectories.
+    * @return A vector of all previous frame's poses.
+    */
+    std::vector<ci::Matrix44f> &History() { return reference_frame_tracks_;  }
+
+    /**
+    * Get the poses from the previous frames to draw past trajectories.
+    * @return A vector of all previous frame's poses.
+    */
+    const std::vector<ci::Matrix44f> &History() const { return reference_frame_tracks_; }
+
   protected:
     
+    void checkSelfName(const std::string &test_name) const { if (test_name != self_name_) throw std::runtime_error(""); }
+
     /**
     * Is this still needed?
     * 
@@ -59,6 +81,10 @@ namespace viz {
     void convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose);
 
     bool do_draw_; /**< Flag set to false when there are no pose value left to draw the object. */
+
+    std::vector<ci::Matrix44f> reference_frame_tracks_; /**< Keeps track of previous SE3s to represent the model for plotting trajectories across 3D space. For articulated bodies this should be the 'global' pose of the object. */
+
+    std::string self_name_;
 
   };
 
@@ -71,8 +97,23 @@ namespace viz {
 
   public:
     
+    /**
+    * Load a pose grabber from a config file. This file contains the model coordinate file (if applicable) and pose file.
+    */
     explicit PoseGrabber(const ConfigReader &reader);
-    virtual void LoadPose();
+
+    /**
+    * Load the next SE3 pose transform from the file. This changes the class' internal representation of its pose when it renders the model.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
+    * UI to account for a rigid offset.
+    */
+    virtual void LoadPose(const bool no_reload);
+    
+    /**
+    * Return the current pose estimate.
+    * @return Return the current pose estimate.
+    */
+    virtual ci::Matrix44f GetPose() { return cached_model_pose_; }
 
     /**
     * Write this pose grabber's computed pose to an output file.
@@ -89,9 +130,11 @@ namespace viz {
 
   protected:
     
-    std::ifstream ifs_;
-    Model model_;
+    std::ifstream ifs_; /**< The file stream containing the SE3 transforms for each frame. */
     
+    Model model_; /**< The Model to draw for the object. May be empty if for example the PoseGrabber represents a camera. */
+
+    ci::Matrix44f cached_model_pose_; /**< Maintain a cache of object pose so that model can be refreshed without reloading. */
 
   };
 
@@ -105,17 +148,29 @@ namespace viz {
 
   public:
 
+    /**
+    * Construct a base class da vinci pose grabber. This really just loads the model.
+    * @param[in] reader The configuration file.
+    */
     BaseDaVinciPoseGrabber(const ConfigReader &reader);
-    virtual void LoadPose() = 0;
+
+    /**
+    * Load the next pose value from the file. This changes the class' internal representation of its pose when it renders the model.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
+    * UI to account for a rigid offset.
+    */
+    virtual void LoadPose(const bool no_reload) = 0;
 
   protected:
 
+    /**
+    * Possibly not needed?
+    */
     void convertFromDaVinciPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose);
 
-
-    davinci::DaVinciKinematicChain chain_;
-    davinci::DaVinciJoint target_joint_;
-    DaVinciInstrument model_;
+    davinci::DaVinciKinematicChain chain_; /**< */
+    davinci::DaVinciJoint target_joint_; /**< */
+    DaVinciInstrument model_; /**< */
 
   };
 
@@ -138,8 +193,16 @@ namespace viz {
 
     /**
     * Load a set of DH parameters from a file and set up the manipulator transforms using the DH chain.
+    * @param[in] no_reloa d Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
+    * UI to account for a rigid offset.
     */
-    virtual void LoadPose();
+    virtual void LoadPose(const bool no_reload);
+
+    /**
+    * Return the current pose estimate.
+    * @return Return the current pose estimate.
+    */
+    virtual ci::Matrix44f GetPose();
 
     /**
     * As the DH parameters collected from the da Vinci joint encoders have some fixed offsets, the offset vectors can be used
@@ -183,11 +246,15 @@ namespace viz {
 
     std::vector<double> arm_offsets_; /**< Arm offset values. */
     std::vector<double> base_offsets_; /**< Base offset values. */
-
-    std::size_t num_base_joints_;
-    std::size_t num_arm_joints_;
+    
+    std::vector<double> arm_joints_; /**< Maintain a cache of arm joint values so that arm can be refreshed without reloading. */
+    std::vector<double> base_joints_; /**< Maintain a cache of base joint values so that arm can be refreshed without reloading. */
+    
+    std::size_t num_base_joints_; /**< The number of joints in the robot base arm (setup joints). */
+    std::size_t num_arm_joints_; /**< The number of joints in the robot arm. */
 
   };
+  
   /**
   * @class SE3DaVinciPoseGrabber
   * @brief A class to represent a da vinci robot manipulator which has been tracked in a camera coordinate frame.
@@ -208,8 +275,16 @@ namespace viz {
 
     /**
     * Override the pose loader method which normally accepts DH parameters to accept SE3 + DH parameters.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
+    * UI to account for a rigid offset.
     */
-    virtual void LoadPose();
+    virtual void LoadPose(const bool no_reload);
+
+    /**
+    * Return the current pose estimate.
+    * @return Return the current pose estimate.
+    */
+    virtual ci::Matrix44f GetPose() { return shaft_pose_; }
 
     /**
     * Write this pose grabber's computed pose to an output file. 
@@ -226,8 +301,11 @@ namespace viz {
 
   protected:
 
-    std::size_t num_wrist_joints_;
-    std::ifstream ifs_;
+    std::size_t num_wrist_joints_; /**< Number of joints in the wrist of the instrument. */
+    std::ifstream ifs_; /**< The file to read the DH and SE3 values from. */
+
+    ci::Matrix44f shaft_pose_; /**< Maintain a cache of shaft pose value so that model can be refreshed without reloading. */
+    std::vector<double> wrist_dh_params_; /**< Maintain a  */
 
   };
 

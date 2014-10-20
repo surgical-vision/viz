@@ -35,7 +35,10 @@ void BasePoseGrabber::convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::M
 
 }
 
-PoseGrabber::PoseGrabber(const ConfigReader &reader){
+PoseGrabber::PoseGrabber(const ConfigReader &reader) {
+
+  self_name_ = "pose-grabber";
+  checkSelfName(reader.get_element("name"));
 
   model_.LoadData(reader.get_element("model-file"));
   ifs_.open(reader.get_element("pose-file"));
@@ -48,38 +51,59 @@ PoseGrabber::PoseGrabber(const ConfigReader &reader){
 
 }
 
-void PoseGrabber::LoadPose(){
+void PoseGrabber::LoadPose(const bool no_reload){
 
-  ci::Matrix44f next_pose;
-
-  next_pose.setToIdentity();
   do_draw_ = false; //set to true only if we read a 'good' pose
 
-  try{
-    std::string line;
-    int row = 0;
-    while (1)
-    {
-      std::getline(ifs_, line);
-      if (row == 4) break;
-      if (line[0] == '#' || line.length() < 1) continue;
-      std::stringstream ss(line);
-      for (int col = 0; col < 4; ++col){
-        float val;
-        ss >> val;
-        next_pose.at(row, col) = val;
+  //load the new pose (if requested).
+  if (no_reload){
+    try{
+      std::string line;
+      int row = 0;
+      while (1)
+      {
+        std::getline(ifs_, line);
+        if (row == 4) break;
+        if (line[0] == '#' || line.length() < 1) continue;
+        std::stringstream ss(line);
+        for (int col = 0; col < 4; ++col){
+          float val;
+          ss >> val;
+          cached_model_pose_.at(row, col) = val;
+        }
+        row++;
       }
-      row++;
+
+      //update the reference list of old tracks for drawing trajectories
+      reference_frame_tracks_.push_back(cached_model_pose_);
+      do_draw_ = true;
+
     }
-    do_draw_ = true;
-  }
-  catch (std::ofstream::failure e){
-    next_pose.setToIdentity();
-    do_draw_ = false;
+    catch (std::ofstream::failure e){
+      cached_model_pose_.setToIdentity();
+      do_draw_ = false;
+    }
   }
 
-  std::vector<ci::Matrix44f> ret({ next_pose });
+  // update the model with the pose
+  std::vector<ci::Matrix44f> ret({ cached_model_pose_ });
   model_.SetTransformSet(ret);
+
+}
+
+std::string PoseGrabber::writePoseToString() const {
+
+  throw std::runtime_error("");
+
+  return "";
+
+}
+
+std::string PoseGrabber::writePoseToString(const ci::Matrix44f &camera_pose) const {
+
+  throw std::runtime_error("");
+
+  return "";
 
 }
 
@@ -106,6 +130,9 @@ void BaseDaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose
 }
 
 DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaVinciPoseGrabber(reader) {
+
+  self_name_ = "dh-davinci-grabber";
+  checkSelfName(reader.get_element("name"));
 
   if (reader.get_element("joint") == "PSM1")
     target_joint_ = davinci::DaVinciJoint::PSM1;
@@ -150,26 +177,23 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaV
 
 }
 
-void DHDaVinciPoseGrabber::LoadPose(){
-
-  std::vector<double> base_joints, arm_joints;
-  
-  if(!ReadDHFromFiles(base_joints, arm_joints))
-    return;
+ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
 
   if (target_joint_ == davinci::ECM){
-    
+
     API_ECM ecm;
 
-    for (std::size_t i = 0; i < base_joints.size(); ++i){
-      ecm.sj_joint_angles[i] = base_joints[i] + base_offsets_[i];
+    for (std::size_t i = 0; i < base_joints_.size(); ++i){
+      ecm.sj_joint_angles[i] = base_joints_[i] + base_offsets_[i];
     }
 
-    for (std::size_t i = 0; i < arm_joints.size(); ++i){
-      ecm.jnt_pos[i] = arm_joints[i] + arm_offsets_[i];
+    for (std::size_t i = 0; i < arm_joints_.size(); ++i){
+      ecm.jnt_pos[i] = arm_joints_[i] + arm_offsets_[i];
     }
-    
+
     buildKinematicChainECM1(chain_, ecm, model_.Shaft().transform_);
+
+    return model_.Shaft().transform_;
 
   }
 
@@ -177,12 +201,12 @@ void DHDaVinciPoseGrabber::LoadPose(){
 
     API_PSM psm;
 
-    for (std::size_t i = 0; i < base_joints.size(); ++i){
-      psm.sj_joint_angles[i] = base_joints[i] + base_offsets_[i];
+    for (std::size_t i = 0; i < base_joints_.size(); ++i){
+      psm.sj_joint_angles[i] = base_joints_[i] + base_offsets_[i];
     }
 
-    for (std::size_t i = 0; i < arm_joints.size(); ++i){
-      psm.jnt_pos[i] = arm_joints[i] + arm_offsets_[i];
+    for (std::size_t i = 0; i < arm_joints_.size(); ++i){
+      psm.jnt_pos[i] = arm_joints_[i] + arm_offsets_[i];
     }
 
     if (target_joint_ == davinci::PSM1)
@@ -190,6 +214,27 @@ void DHDaVinciPoseGrabber::LoadPose(){
     else if (target_joint_ == davinci::PSM2)
       buildKinematicChainPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
 
+    return model_.Shaft().transform_;
+
+  }
+  else{
+
+    throw std::runtime_error("Error, bad joint type");
+
+  }
+}
+
+void DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
+
+  if (no_reload && !ReadDHFromFiles(base_joints_, arm_joints_))
+    return;
+
+  //don't care about the return.
+  GetPose();
+
+  // update the list of previous poses for plotting trajectories.
+  if (!no_reload){
+    reference_frame_tracks_.push_back(model_.Shaft().transform_);
   }
 
 }
@@ -219,7 +264,26 @@ bool DHDaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_base_joints,
 
 }
 
+std::string DHDaVinciPoseGrabber::writePoseToString() const {
+
+  throw std::runtime_error("");
+
+  return "";
+
+}
+
+std::string DHDaVinciPoseGrabber::writePoseToString(const ci::Matrix44f &camera_pose) const {
+
+  throw std::runtime_error("");
+
+  return "";
+
+}
+
 SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader) : BaseDaVinciPoseGrabber(reader) {
+
+  self_name_ = "se3-davinci-grabber";
+  checkSelfName(reader.get_element("name"));
 
   if (reader.get_element("joint") == "PSM1")
     target_joint_ = davinci::DaVinciJoint::PSM1;
@@ -236,56 +300,76 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader) : BaseD
 
 }
 
-void SE3DaVinciPoseGrabber::LoadPose(){
+void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
   
-  ci::Matrix44f next_pose;
-  next_pose.setToIdentity();
-  std::vector<double> wrist_joints;
+  while (wrist_dh_params_.size() < num_wrist_joints_) wrist_dh_params_.push_back(0);
 
   do_draw_ = false; //set to true only if we read a 'good' pose
 
-  try{
-    std::string line;
-    int row = 0;
-    while (1)
-    {
-      std::getline(ifs_, line);
-      if (row == 4) break;
-      if (line[0] == '#' || line.length() < 1) continue;
-      std::stringstream ss(line);
-      for (int col = 0; col < 4; ++col){
-        float val;
-        ss >> val;
-        next_pose.at(row, col) = val;
+  if (!no_reload){
+
+    try{
+      std::string line;
+      int row = 0;
+      while (1)
+      {
+        std::getline(ifs_, line);
+        if (row == 4) break;
+        if (line[0] == '#' || line.length() < 1) continue;
+        std::stringstream ss(line);
+        for (int col = 0; col < 4; ++col){
+          float val;
+          ss >> val;
+          shaft_pose_.at(row, col) = val;
+        }
+        row++;
       }
-      row++;
-    }
-    do_draw_ = true;
+      do_draw_ = true;
 
-    for (int i = 0; i < num_wrist_joints_; ++i){
-      double x;
-      ifs_ >> x;
-      wrist_joints.push_back(x);
+      for (int i = 0; i < num_wrist_joints_; ++i){
+        double x;
+        ifs_ >> x;
+        wrist_dh_params_[i] = x;
+      }
+
+      // update the list of previous poses for plotting trajectories.
+      reference_frame_tracks_.push_back(shaft_pose_);
+
+    }
+    catch (std::ofstream::failure e){
+      shaft_pose_.setToIdentity();
+      do_draw_ = false;
     }
 
   }
-  catch (std::ofstream::failure e){
-    next_pose.setToIdentity();
-    do_draw_ = false;
-  }
-
   if (do_draw_ == false) return;
 
-  model_.Shaft().transform_ = next_pose;
+  model_.Shaft().transform_ = shaft_pose_;
 
   API_PSM psm;
-  for (size_t i = 0; i < wrist_joints.size(); ++i){
-    psm.jnt_pos[i] = wrist_joints[i];
+  for (size_t i = 0; i < num_wrist_joints_; ++i){
+    psm.jnt_pos[i] = wrist_dh_params_[i];
   }
 
   if (target_joint_ == davinci::PSM1)
     buildKinematicChainAtEndPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
   else if (target_joint_ == davinci::PSM2)
     buildKinematicChainAtEndPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+
+}
+
+std::string SE3DaVinciPoseGrabber::writePoseToString() const {
+
+  throw std::runtime_error("");
+
+  return "";
+
+}
+
+std::string SE3DaVinciPoseGrabber::writePoseToString(const ci::Matrix44f &camera_pose) const {
+
+  throw std::runtime_error("");
+
+  return "";
 
 }

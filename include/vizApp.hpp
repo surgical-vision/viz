@@ -44,10 +44,12 @@ namespace viz {
     void drawTarget(ci::Matrix44f &inverse);
     void drawCamera(gl::Texture &image_data);
     void drawImageOnCamera(gl::Texture &image_data, ci::Vec3f &tl, ci::Vec3f &bl, ci::Vec3f &tr, ci::Vec3f &br);
-    void drawTrajectories(std::vector<ci::Vec3f> &points_to_draw, std::vector<ci::Matrix44f> &transforms, ci::Color &color);
+    void drawTrajectories(const std::vector<ci::Matrix44f> &transforms, ci::Color &color);
     void drawCameraTracker();
     
     void loadTrackables(const ConfigReader &reader);
+    ci::Matrix44f getCameraPose();
+    void loadTrackable(const std::string &filepath);
 
     void applyOffsetToCamera(KeyEvent &event);
     void applyOffsetToTrackedObject(KeyEvent &event, boost::shared_ptr<DHDaVinciPoseGrabber> grabber);
@@ -64,23 +66,22 @@ namespace viz {
 
     MayaCamUI maya_cam_;
     
-    std::vector<BasePoseGrabber> trackables_;
-    boost::scoped_ptr<PoseGrabber> moveable_camera_;
+    std::vector< boost::shared_ptr<BasePoseGrabber> > trackables_;
+    boost::scoped_ptr<BasePoseGrabber> moveable_camera_;
+    boost::scoped_ptr<BasePoseGrabber> tracked_camera_;
     
     gl::GlslProg shader_;
 
+    size_t camera_image_width_; /**< The image width we are loading from the camera. */
+    size_t camera_image_height_; /**< The image height we are loading from the camera. */
+    size_t three_dim_viz_width_; /**< The width of the 3D visualizer window. */
+    size_t three_dim_viz_height_; /**< The width of the 3D visualizer window. */
 
-    bool load_next_image_;
-    bool save_next_image_;
-    bool save_toggle_;
+    bool run_video_; /**< Toggle to set whether the video just runs and loads new poses without prompting. */
+    bool load_next_image_; /**< Toggle to manually load the next frame and poses. */
+    bool save_toggle_; /**< Toggle to set saving of all data from the visualizer (poses and video frames). */
+    bool update_toggle_; /**< Toggle to set whether the updates load from the file or just refresh. Useful for instance if manual offsets are being applied to pose of trackables in the UI and you want to draw these new poses. */
 
-    bool manual_control_toggle_;
-
-    bool has_loaded_new_pwp3d_estimate_;
-
-    bool draw2;
-    bool draw3;
-    bool draw3d;
 
   };
 
