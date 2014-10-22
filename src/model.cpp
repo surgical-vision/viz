@@ -29,11 +29,23 @@ ci::JsonTree BaseModel::OpenFile(const std::string &datafile_path) const {
     }
   }
   else{
+
     throw std::runtime_error("Error, unsupported file type");
   }
 
 }
 
+void BaseModel::InternalDraw(const RenderData &rd) const {
+
+  ci::gl::pushModelView();
+
+  ci::gl::multModelView(rd.transform_);
+
+  ci::gl::draw(rd.vbo_);
+
+  ci::gl::popModelView();
+
+}
 
 void BaseModel::LoadComponent(const ci::JsonTree &tree, BaseModel::RenderData &target, const std::string &root_dir){
 
@@ -48,15 +60,18 @@ void BaseModel::LoadComponent(const ci::JsonTree &tree, BaseModel::RenderData &t
   target.vbo_ = ci::gl::VboMesh(target.model_);
 
   boost::filesystem::path tex_file = boost::filesystem::path(root_dir) / boost::filesystem::path(tree["texture"].getValue<std::string>());
-  if (!boost::filesystem::exists(tex_file)) throw(std::runtime_error("Error, the file doens't exist!\n"));
-  target.texture_ = ci::gl::Texture(ci::loadImage((tex_file.string())));
-  
-  ci::gl::Texture::Format format;
-  format.enableMipmapping(true);
+  //if (!boost::filesystem::exists(tex_file)) throw(std::runtime_error("Error, the file doens't exist!\n"));
+  if (boost::filesystem::exists(tex_file)){
+    ci::gl::Texture::Format format;
+    format.enableMipmapping(true);
+    target.texture_ = ci::gl::Texture(ci::loadImage((tex_file.string())),format);
+  }
 
 }
 
 void Model::Draw() const {
+
+  InternalDraw(body_);
 
 }
 
@@ -79,13 +94,21 @@ void Model::SetTransformSet(const std::vector<ci::Matrix44f> &transforms){
 
 void DaVinciInstrument::Draw() const {
 
+  InternalDraw(shaft_);
+  InternalDraw(head_);
+  InternalDraw(clasper1_);
+  InternalDraw(clasper2_);
+
 }
 
 void DaVinciInstrument::LoadData(const std::string &datafile_path){
   
   ci::JsonTree tree = OpenFile(datafile_path);
 
-  
+  LoadComponent(tree.getChild("shaft"), shaft_, boost::filesystem::path(datafile_path).parent_path().string());
+  LoadComponent(tree.getChild("head"), head_, boost::filesystem::path(datafile_path).parent_path().string());
+  LoadComponent(tree.getChild("clasper1"), clasper1_ , boost::filesystem::path(datafile_path).parent_path().string());
+  LoadComponent(tree.getChild("clasper2"), clasper2_, boost::filesystem::path(datafile_path).parent_path().string());
 
 }
 

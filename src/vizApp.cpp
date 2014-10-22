@@ -8,31 +8,38 @@
 
 using namespace viz;
 
-void vizApp::setup(){
-
-  std::vector<std::string> cmd_line_args = getArgs();
-
-  if (cmd_line_args.size() < 2){
-    throw std::runtime_error("Error.");
-  }
-
-  ConfigReader reader(cmd_line_args[1]);
+void vizApp::setupFromConfig(const std::string &path){
+  
+  ConfigReader reader(path);
 
   if (!boost::filesystem::is_directory(reader.get_element("root-dir")))
     throw std::runtime_error("Error, cannot file config dir!");
 
-  if (!boost::filesystem::is_directory(reader.get_element("output"))){
-    boost::filesystem::create_directory(reader.get_element("output"));
+  if (!boost::filesystem::is_directory(reader.get_element("output-dir"))){
+    boost::filesystem::create_directory(reader.get_element("output-dir"));
   }
 
-  video_left_ = VideoIO(reader.get_element("left-input-video"), reader.get_element("output-dir") + "/" + reader.get_element("left-output-video"));  
-  video_right_ = VideoIO(reader.get_element("right-input-video"), reader.get_element("output-dir") + "/" + reader.get_element("right-output-video"));
+  video_left_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("left-input-video"), reader.get_element("output-dir") + "/" + reader.get_element("left-output-video"));
+  video_right_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("right-input-video"), reader.get_element("output-dir") + "/" + reader.get_element("right-output-video"));
 
-  camera_.Setup(reader.get_element("root_dir") + "/" + reader.get_element("camera_config"), reader.get_element_as_int("window_width"), reader.get_element_as_int("window_height"), 1, 1000);
+  camera_.Setup(reader.get_element("root-dir") + "/" + reader.get_element("camera-config"), reader.get_element_as_int("window-width"), reader.get_element_as_int("window-height"), 1, 1000);
 
   try{
-    moveable_camera_.reset(new PoseGrabber(reader));
-    tracked_camera_.reset(new PoseGrabber(reader)); //if there is no moveable camera then there won't be a tracked camera
+    moveable_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera"))));
+    tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")))); //if there is no moveable camera then there won't be a tracked camera
+  }
+  catch (std::runtime_error){
+    try{
+      moveable_camera_.reset(new DHDaVinciPoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera"))));
+      tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")))); //tracked camera will always be a SE3 tracked, not DH.
+    }
+    catch (std::runtime_error){
+
+    }
+  }
+  
+  try{
+    loadTrackables(reader);
   }
   catch (std::runtime_error){
 
@@ -41,14 +48,50 @@ void vizApp::setup(){
   camera_image_width_ = reader.get_element_as_int("window-width");
   camera_image_height_ = reader.get_element_as_int("window-height");
 
+  three_dim_viz_width_ = reader.get_element_as_int("viz-width");
+  three_dim_viz_height_ = reader.get_element_as_int("viz-height");
+
   framebuffer_ = gl::Fbo(camera_image_width_, camera_image_height_);
   framebuffer_3d_ = gl::Fbo(three_dim_viz_width_, three_dim_viz_height_);
 
   setWindowSize((2 * framebuffer_.getWidth()), framebuffer_.getHeight() + framebuffer_3d_.getHeight());
 
-  run_video_ = false;
   load_next_image_ = true;
+
+}
+
+void vizApp::setup(){
+
+  std::vector<std::string> cmd_line_args = getArgs();
+
+  if (cmd_line_args.size() == 2){
+    
+    try{
+      setupFromConfig(cmd_line_args[1]);
+    }
+    catch (std::runtime_error){
+      ci::app::console() << "Error, input file is bad!\n";
+    }
+
+  }
+  else{
+  
+    camera_image_width_ = 640;
+    camera_image_height_ = 480;
+    three_dim_viz_width_ = 500;
+    three_dim_viz_height_ = 500;
+
+    framebuffer_ = gl::Fbo(camera_image_width_, camera_image_height_);
+    framebuffer_3d_ = gl::Fbo(three_dim_viz_width_, three_dim_viz_height_);
+
+    setWindowSize((2 * framebuffer_.getWidth()), framebuffer_.getHeight() + framebuffer_3d_.getHeight());
+    load_next_image_ = false;
+
+  }
+
+  run_video_ = false;
   save_toggle_ = false;
+  update_toggle_ = false;
 
 }
 
@@ -93,6 +136,8 @@ void vizApp::update(){
 
 void vizApp::draw2D(gl::Texture &tex){
   
+  if (!tex) return;
+
   GLint vp[4];
   glGetIntegerv(GL_VIEWPORT, vp);
   glViewport(0, 0, camera_image_width_, camera_image_height_);
@@ -384,39 +429,11 @@ void vizApp::drawTarget(){
  // //glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.0f);
  // //glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.00015f);
 
-  
-  //for (auto mop : moving_objects_pg_){
+  for (size_t i = 0; i < trackables_.size(); ++i){
 
-  //  const Pose pose = mop->getPose();
-  //  
-  //  auto meshes_textures_transforms = mop->getDaVinciTrackable()->GetRenderableMeshes();
+    trackables_[i]->Draw();
 
-  //  for (std::size_t i = 0; i < meshes_textures_transforms.size(); ++i){
-
-  //    if ((!draw2 && i == 2) || (!draw3 && i == 3)){
-  //      continue;
-  //    }
-
-  //    //shader_.bind();
-  //    //shader_.uniform("NumEnabledLights", 1);        
-
-  //    gl::pushModelView();
-  //    const auto &mesh = meshes_textures_transforms[i].get<0>();
-  //    const auto &texture = meshes_textures_transforms[i].get<1>();
-
-  //    gl::multModelView(pose.poses_[i].first); //multiply by the pose of this tracked object
-  //    ci::app::console() << "Model view = \n" << gl::getModelView() << std::endl;
-  //    //gl::multModelView(transform);
-
-  //    gl::draw(*mesh);
-
-  //    //shader_.unbind();
-  //    gl::popModelView();
-
-  //  }  
-
-  //}
-
+  }
 
   glDisable(GL_LIGHTING);
 }
@@ -438,7 +455,6 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
 
   gl::disableDepthRead();
 
-  //gl::draw(texture);
   draw2D(texture);
   
   camera_.setupCameras(); //do viewport cache and set model view to ident
@@ -478,9 +494,9 @@ void vizApp::loadTrackables(const ConfigReader &reader){
 
     try{
 
-      std::stringstream s("trackable-"); 
-      s << i;
-      loadTrackable(s.str());
+      std::stringstream s; 
+      s << "trackable-" << i;
+      loadTrackable(reader.get_element("root-dir") + "/" + reader.get_element(s.str()));
 
     }
     catch (std::runtime_error){
@@ -621,12 +637,24 @@ void vizApp::mouseDown(MouseEvent event){
   maya_cam_.mouseDown(event.getPos());
 }
 
+void vizApp::fileDrop(FileDropEvent event){
+
+  try{
+    for (int i = 0; i < event.getNumFiles(); ++i)
+      setupFromConfig(event.getFile(i).string());
+  }
+  catch (std::runtime_error){
+    ci::app::console() << "Error loading from this config file\n";
+  }
+
+}
+
 void vizApp::keyDown(KeyEvent event){
 
-  //if (event.getChar() == ' '){
-  //  load_next_image_ = true;
-  //  return;
-  //}
+  if (event.getChar() == ' '){
+    load_next_image_ = true;
+    return;
+  }
   //else if (event.getChar() == 'j'){
   //  draw2 = !draw2;
   //  return;
@@ -635,17 +663,17 @@ void vizApp::keyDown(KeyEvent event){
   //  draw3 = !draw3;
   //  return;
   //}
-  //else if (event.getChar() == 's'){
-  //  save_toggle_ = !save_toggle_;
-  //  return;
-  //}
+  else if (event.getChar() == 's'){
+    save_toggle_ = !save_toggle_;
+    return;
+  }
   //else if (event.getChar() == 'a'){
   //  draw3d = !draw3d;
   //  return;
   //}
-  //else if (event.getCode() == KeyEvent::KEY_ESCAPE){
-  //  shutdown();
-  //}
+  else if (event.getCode() == KeyEvent::KEY_ESCAPE){
+    shutdown();
+  }
   //else if (event.getChar() == 'd'){
   //  manual_control_toggle_ = !manual_control_toggle_;
   //}

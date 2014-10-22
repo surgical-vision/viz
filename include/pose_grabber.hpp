@@ -52,6 +52,11 @@ namespace viz {
     virtual std::string writePoseToString() const = 0;
 
     /**
+    * Renders the model to the currently bound framebuffer. Assumes OpenGL context is available on current thread.
+    */
+    virtual void Draw() const = 0;
+
+    /**
     * Write this pose grabber's computed pose to an output file with a camera pose transform if this pose should be saved in
     * camera coordinates.
     * @return A formatted representation of the object's pose.
@@ -114,6 +119,11 @@ namespace viz {
     * @return Return the current pose estimate.
     */
     virtual ci::Matrix44f GetPose() { return cached_model_pose_; }
+    
+    /**
+    * Renders the model to the currently bound framebuffer. Assumes OpenGL context is available on current thread.
+    */
+    virtual void Draw() const { model_.Draw(); }
 
     /**
     * Write this pose grabber's computed pose to an output file.
@@ -160,6 +170,11 @@ namespace viz {
     * UI to account for a rigid offset.
     */
     virtual void LoadPose(const bool no_reload) = 0;
+
+    /**
+    * Renders the model to the currently bound framebuffer. Assumes OpenGL context is available on current thread.
+    */
+    virtual void Draw() const { model_.Draw(); }
 
   protected:
 

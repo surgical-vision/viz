@@ -38,12 +38,20 @@ namespace viz {
 
   protected:
 
+
     struct RenderData {
       ci::TriMesh model_; /**< The 3D mesh that the model represents. */
       ci::gl::VboMesh	vbo_; /**< VBO to store the model for faster drawing. */
       ci::gl::Texture texture_; /**< The texture for the model. */
       ci::Matrix44f transform_; /**< The transform from world coordinates to the model coordinate system. */
     };
+
+
+    /**
+    * Draw a single RenderData model
+    * @param[in] rd The model to draw.
+    */
+    void InternalDraw(const RenderData &rd) const;
 
     ci::JsonTree OpenFile(const std::string &datafile_path) const;
     

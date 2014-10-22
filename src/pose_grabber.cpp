@@ -109,7 +109,12 @@ std::string PoseGrabber::writePoseToString(const ci::Matrix44f &camera_pose) con
 
 BaseDaVinciPoseGrabber::BaseDaVinciPoseGrabber(const ConfigReader &reader){
   
-  model_.LoadData(reader.get_element("model-file"));
+  try{
+    model_.LoadData(reader.get_element("model-file"));
+  }
+  catch (std::runtime_error){
+    //no model (e.g. tracking camera)
+  }
 
 }
 
@@ -159,6 +164,11 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaV
     break;
   }
 
+  arm_offsets_ = std::vector<double>(num_arm_joints_, 0.0);
+  base_offsets_ = std::vector<double>(num_base_joints_, 0.0);
+  arm_joints_ = std::vector<double>(num_arm_joints_, 0.0);
+  base_joints_ = std::vector<double>(num_base_joints_, 0.0);
+
   base_ifs_.open(reader.get_element("base-joint-file"));
   if (!base_ifs_.is_open()){
     throw std::runtime_error("Error, could not open file: " + reader.get_element("base-joint-file"));
@@ -172,8 +182,6 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaV
   }
 
   arm_ifs_.exceptions(std::ifstream::eofbit);
-
-  model_.LoadData(reader.get_element("model-file"));
 
 }
 
@@ -226,8 +234,10 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
 
 void DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
 
-  if (no_reload && !ReadDHFromFiles(base_joints_, arm_joints_))
-    return;
+  if (!no_reload){
+    if (!ReadDHFromFiles(base_joints_, arm_joints_))
+      return;
+  }
 
   //don't care about the return.
   GetPose();
@@ -241,17 +251,20 @@ void DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
 
 bool DHDaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_base_joints, std::vector<double> &psm_arm_joints){
 
+  assert(num_arm_joints_ == psm_arm_joints.size());
+  assert(num_base_joints_ == psm_base_joints.size());
+
   try{
     for (int i = 0; i < num_arm_joints_; ++i){
       double x;
       arm_ifs_ >> x;
-      psm_arm_joints.push_back(x);
+      psm_arm_joints[i] = x;
     }
 
     for (int i = 0; i < num_base_joints_; ++i){
       double x;
       base_ifs_ >> x;
-      psm_base_joints.push_back(x);
+      psm_base_joints[i] = x;
     }
 
   }
@@ -298,13 +311,15 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader) : BaseD
 
   num_wrist_joints_ = 3; //should this load from config file?
 
+  wrist_dh_params_ = std::vector<double>(num_wrist_joints_, 0.0);
+
 }
 
 void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
   
-  while (wrist_dh_params_.size() < num_wrist_joints_) wrist_dh_params_.push_back(0);
-
   do_draw_ = false; //set to true only if we read a 'good' pose
+
+  assert(num_wrist_joints_ == wrist_dh_params_.size());
 
   if (!no_reload){
 

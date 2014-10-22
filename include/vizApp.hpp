@@ -28,9 +28,12 @@ namespace viz {
     virtual void keyDown(KeyEvent event) override;
     virtual void mouseDrag(MouseEvent event) override;
     virtual void shutdown() override;
+    virtual void fileDrop(FileDropEvent event) override;
 
   protected:
 
+    void setupFromConfig(const std::string &path);
+    
     void saveFrame(gl::Texture texture, bool isLeft);
     void drawGrid(float size = 3.9, float step = 0.3, float plane_position = 0.0);
     void drawTarget();
