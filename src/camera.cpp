@@ -135,19 +135,26 @@ void StereoCamera::convertBouguetToDaVinciCoordinates(cv::Mat &left_camera_matri
 
 }
 
+void StereoCamera::setupLeftCamera(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose){
 
-
-void StereoCamera::setupCameras(){
-
-  glGetIntegerv(GL_VIEWPORT, viewport_);
+  glGetIntegerv(GL_VIEWPORT, viewport_cache_);
   glViewport(0, 0, left_eye_.getImageWidth(), left_eye_.getImageHeight());
+  moveEyeToLeftCam(cam, current_camera_pose);
+
+}
+
+void StereoCamera::setupRightCamera(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose){
+
+  glViewport(0, 0, right_eye_.getImageWidth(), right_eye_.getImageHeight());
+  moveEyeToRightCam(cam, current_camera_pose);
 
 }
 
 
 void StereoCamera::unsetCameras(){
 
-  glViewport(viewport_[0], viewport_[1], viewport_[2], viewport_[3]);
+  glViewport(viewport_cache_[0], viewport_cache_[1], viewport_cache_[2], viewport_cache_[3]);
+  glDisable(GL_LIGHTING);
 
 }
 
@@ -163,6 +170,25 @@ void StereoCamera::makeRightEyeCurrent(){
 
 }
 
+void StereoCamera::TurnOnLight(){
+
+  ci::Vec3f eye_point(0, 0, 0);
+  ci::Vec3f view_direction(0, 0, 1);
+  ci::Vec3f world_up(0, -1, 0);
+  
+  glEnable(GL_LIGHTING);
+
+  left_eye_.getLight().setPosition(eye_point);
+  left_eye_.getLight().lookAt(eye_point, view_direction);
+  left_eye_.getLight().enable();
+
+}
+
+void StereoCamera::TurnOffLight(){
+
+  glDisable(GL_LIGHTING);
+
+}
 
 void StereoCamera::moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose){
 
@@ -180,16 +206,15 @@ void StereoCamera::moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &cur
 
   ci::gl::setMatrices(cam.getCamera());
 
+  glEnable(GL_LIGHTING);
+
   left_eye_.getLight().setPosition(eye_point);
   left_eye_.getLight().lookAt(eye_point, view_direction);
- 
+  left_eye_.getLight().enable();
+
   ci::gl::multModelView(current_camera_pose.inverted());
   
-  /*
-  const ci::Matrix44f current_pose = ci::gl::getModelView();
-  left_eye_.getLight().setPosition(current_pose.getTranslate().xyz());
-  left_eye_.getLight().lookAt(current_pose.getTranslate().xyz(), ci::Vec3f(0,0,0));
-  */
+  left_eye_.makeCurrentCamera();
 }
 
 void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose){
@@ -200,17 +225,22 @@ void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &cu
   ci::Vec3f view_direction(0, 0, 1);
   ci::Vec3f world_up(0, -1, 0);
 
-  view_direction = extrinsic_rotation_ * view_direction;
-  world_up = extrinsic_rotation_ * world_up;
+  glEnable(GL_LIGHTING);
+
+  left_eye_.getLight().setPosition(eye_point);
+  left_eye_.getLight().lookAt(eye_point, view_direction);
+  left_eye_.getLight().enable();
 
   camP.setEyePoint(extrinsic_translation_);
-  camP.setViewDirection(view_direction);
-  camP.setWorldUp(world_up);
+  camP.setViewDirection(extrinsic_rotation_ * view_direction);
+  camP.setWorldUp(extrinsic_rotation_ * world_up);
 
   cam.setCurrentCam(camP);
 
   ci::gl::setMatrices(cam.getCamera());
 
   ci::gl::multModelView(current_camera_pose.inverted());
+
+  right_eye_.makeCurrentCamera();
 
 }

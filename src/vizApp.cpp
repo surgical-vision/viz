@@ -112,15 +112,6 @@ void vizApp::update(){
     }
   }
 
-  //ci::Matrix44f flip;
-  //flip.setToIdentity();
-  //flip.at(1, 1) = -1;
-  //flip.at(2, 2) = -1;
-
-  //camera_estimate_matrix_ = first_camera_pose * flip * camera_estimate_matrix_ * flip;
-
-
-
   if (load_next_image_ || run_video_){
     cv::Mat stereo_image;
 
@@ -170,7 +161,7 @@ void vizApp::draw2D(gl::Texture &tex){
 }
 
 void vizApp::draw(){
-	// clear out the window with black
+
   gl::clear( Color( 0, 0, 0 ) ); 
 
   framebuffer_.bindFramebuffer();
@@ -321,50 +312,57 @@ void vizApp::drawCameraTracker(){
 
 void vizApp::draw3D(gl::Texture &image){
 
+  if (trackables_.size() == 0) return;
+
   gl::clear(Color(0.0, 0.0, 0.0));
   
-  //
+  ci::CameraPersp maya;
+  maya.setEyePoint(trackables_[0]->GetPose().getTranslate().xyz() + ci::Vec3f(30, 100, 190));
+  maya.setWorldUp(ci::Vec3f(0, -1, 0));
+  maya.lookAt(trackables_[0]->GetPose().getTranslate().xyz());// ci::Vec3f(0, 0, 5));
+  
 
-  //ci::CameraPersp maya;
-  //maya.setEyePoint(first_camera_pose.getTranslate().xyz() + ci::Vec3f(30, 100, 190));
-  //maya.setWorldUp(ci::Vec3f(0, -1, 0));
-  //maya.lookAt(first_camera_pose.getTranslate().xyz());// ci::Vec3f(0, 0, 5));
-  //
-
-  //gl::pushMatrices();
-  //gl::setMatrices(maya);
+  gl::pushMatrices();
+  gl::setMatrices(maya);
 
   //drawGrid(5000, 1, first_camera_pose.getTranslate().xyz()[2] - 200);
 
-  //ci::Area viewport = gl::getViewport();
-  //gl::setViewport(ci::Area(0, 0, framebuffer_.getWidth(), framebuffer_.getHeight()));
+  ci::Area viewport = gl::getViewport();
+  gl::setViewport(ci::Area(0, 0, framebuffer_3d_.getWidth(), framebuffer_3d_.getHeight()));
 
-  //gl::pushModelView();
-  //gl::multModelView(camera_pose_);
+  if (moveable_camera_){
 
-  //drawCamera(image);
-  //gl::popModelView();
+    gl::pushModelView();
+    gl::multModelView(moveable_camera_->GetPose());
+    camera_.TurnOnLight();
+    drawCamera(image);
+    gl::popModelView();
 
-  /////////////////
+  }
+  
 
-  //gl::pushModelView();
+  if (tracked_camera_){
 
-  //gl::multModelView(first_camera_pose * camera_estimate_matrix_);
-  ////drawCamera();
-  //gl::popModelView();
+    gl::pushModelView();
+    gl::multModelView(tracked_camera_->GetPose());
+    drawCamera(image);
+    gl::popModelView();
 
-  //gl::pushModelView(); 
+  }
 
-  ////gl::multModelView(first_camera_pose.inverted());
-  //drawTarget();
+  
+  for (size_t i = 0; i < trackables_.size(); ++i){
 
-  //gl::popModelView();
+    trackables_[i]->Draw();
 
-  //gl::setViewport(viewport);
-  //gl::popMatrices();
-  //
-  //draw camera frustrum
-  //move camera to new viewpoint and point at origin
+  }
+
+  if (moveable_camera_)
+    camera_.TurnOffLight();
+
+  gl::setViewport(viewport);
+  gl::popMatrices();
+
 }
 
 void vizApp::saveFrame(gl::Texture texture, bool isLeft){
@@ -409,25 +407,11 @@ void vizApp::shutdown(){
   //  pg->getJDHStream().close();
   //}
 
-
-  
   AppNative::shutdown();
 
 }
 
 void vizApp::drawTarget(){
-
-  gl::enableDepthRead();
-  gl::enableDepthWrite();
-  glEnable(GL_COLOR_MATERIAL);
-  glEnable(GL_LIGHTING);
-  glEnable(GL_LIGHT0);
-
- // GLfloat light_position[] = { 0, 0, 0, 30 };
- ///glLightfv(GL_LIGHT0, GL_POSITION, light_position);
- // //glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.0f);
- // //glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.0f);
- // //glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.00015f);
 
   for (size_t i = 0; i < trackables_.size(); ++i){
 
@@ -435,7 +419,6 @@ void vizApp::drawTarget(){
 
   }
 
-  glDisable(GL_LIGHTING);
 }
 
 ci::Matrix44f vizApp::getCameraPose(){
@@ -457,31 +440,19 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
 
   draw2D(texture);
   
-  camera_.setupCameras(); //do viewport cache and set model view to ident
-
+  gl::enableDepthRead();
+  gl::enableDepthWrite();
   gl::pushMatrices();
 
-  ci::gl::Light &light = camera_.getLight();
-  light.enable();
-
   if (is_left){
-    camera_.moveEyeToLeftCam(maya_cam_, getCameraPose()); //set the position/modelview of the camera (setViewDirection etc)
+    camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
   }
   else{
-    camera_.moveEyeToRightCam(maya_cam_, getCameraPose());
+    camera_.setupRightCamera(maya_cam_, getCameraPose());
   }
 
-  if (is_left){
-    camera_.makeLeftEyeCurrent();
-  }
-  else{
-    camera_.makeRightEyeCurrent();
-  }
-  
   drawTarget();
   
-  light.disable();
-
   gl::popMatrices(); 
 
   camera_.unsetCameras(); //reset the viewport values

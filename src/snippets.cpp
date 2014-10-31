@@ -179,11 +179,11 @@ void buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, const API_PSM
   grip2 = ci::Matrix44d(A);
 
   //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
-  double val = psm.jnt_pos[6];
-  grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  float val = psm.jnt_pos[6];
+  grip1.rotate(ci::Vec3f(0.0f, 1.0f, 0.0f), 0.5f*val);
 
-  grip2.rotate(ci::Vec3d(0, 0, 1), M_PI);
-  grip2.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  grip2.rotate(ci::Vec3f(0.0f, 0.0f, 1.0f), (float)M_PI);
+  grip2.rotate(ci::Vec3f(0.0f, 1.0f, 0.0f), 0.5*val);
 
 }
 

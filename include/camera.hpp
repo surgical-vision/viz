@@ -13,7 +13,6 @@ namespace viz {
 
   public:
 
-    
     Camera(int light_id) : is_setup_(false), light_(ci::gl::Light(ci::gl::Light::Type::DIRECTIONAL, light_id)) {}
 
     void Setup(const cv::Mat camera_matrix, const cv::Mat distortion_params, const int image_width, const int image_height, const int near_clip_distance, const int far_clip_distance);
@@ -24,6 +23,9 @@ namespace viz {
     int getImageHeight() const { return image_height_; }
 
     ci::gl::Light &getLight() { return light_; }
+
+    void TurnOnLight();
+    void TurnOffLight();
 
   protected:
 
@@ -51,11 +53,12 @@ namespace viz {
 
     void Setup(const std::string &calibration_file, const int image_width, const int image_height, const int near_clip_distance, const int far_clip_distance); 
 
-    void moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);
-    void moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);
+    void setupLeftCamera(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);
+    void setupRightCamera(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);
+    
     void makeLeftEyeCurrent();
     void makeRightEyeCurrent();
-    void setupCameras();
+
     void unsetCameras();
 
     ci::gl::Light &getLight() { return left_eye_.getLight(); }
@@ -65,8 +68,13 @@ namespace viz {
     ci::Vec3f getExtrinsicTranslation() const { return extrinsic_translation_; }
     ci::Matrix33f getExtrinsicRotation() const { return extrinsic_rotation_; }
 
+    void TurnOnLight();
+    void TurnOffLight();
+
   protected:
 
+    void moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);
+    void moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);
     
     void convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv::Mat &right_camera_matrix, cv::Mat &extrinsic_rotation, cv::Mat &extrinsic_translation, const int image_width, const int image_height);
     void convertBouguetToDaVinciCoordinates(cv::Mat &left_camera_matrix, cv::Mat &right_camera_matrix, cv::Mat &extrinsic_rotation, cv::Mat &extrinsic_translation, const int image_width, const int image_height);
@@ -74,7 +82,7 @@ namespace viz {
     Camera left_eye_;
     Camera right_eye_;
 
-    GLint viewport_[4];
+    GLint viewport_cache_[4];
 
     ci::Matrix33f extrinsic_rotation_;
     ci::Vec3f extrinsic_translation_;

@@ -1,5 +1,6 @@
 #include <boost/filesystem.hpp>
-#include "cinder/ImageIo.h"
+#include <cinder/ImageIo.h>
+#include <cinder/app/App.h>
 
 #include "../include/model.hpp"
 
@@ -39,9 +40,15 @@ void BaseModel::InternalDraw(const RenderData &rd) const {
 
   ci::gl::pushModelView();
 
+  ci::app::console() << "transform = \n" << rd.transform_ << std::endl;
+
   ci::gl::multModelView(rd.transform_);
 
+  glEnable(GL_COLOR_MATERIAL); //cinder uses colors rather than materials which are ignore by lighting unless you do this call.
+  
   ci::gl::draw(rd.vbo_);
+
+  glDisable(GL_COLOR_MATERIAL);
 
   ci::gl::popModelView();
 
@@ -55,17 +62,18 @@ void BaseModel::LoadComponent(const ci::JsonTree &tree, BaseModel::RenderData &t
   boost::filesystem::path mat_file = boost::filesystem::path(root_dir) / boost::filesystem::path(tree["mtl-file"].getValue<std::string>());
   if (!boost::filesystem::exists(mat_file)) throw(std::runtime_error("Error, the file doesn't exist!\n"));
 
-  ci::ObjLoader loader(ci::loadFile(obj_file.string()), ci::loadFile(mat_file.string()));
-  loader.load(&target.model_);
-  target.vbo_ = ci::gl::VboMesh(target.model_);
-
   boost::filesystem::path tex_file = boost::filesystem::path(root_dir) / boost::filesystem::path(tree["texture"].getValue<std::string>());
+  bool has_texture = false;
   //if (!boost::filesystem::exists(tex_file)) throw(std::runtime_error("Error, the file doens't exist!\n"));
-  if (boost::filesystem::exists(tex_file)){
+  if (has_texture = boost::filesystem::exists(tex_file)){
     ci::gl::Texture::Format format;
     format.enableMipmapping(true);
-    target.texture_ = ci::gl::Texture(ci::loadImage((tex_file.string())),format);
+    target.texture_ = ci::gl::Texture(ci::loadImage((tex_file.string())), format);
   }
+
+  ci::ObjLoader loader(ci::loadFile(obj_file.string()), ci::loadFile(mat_file.string()));
+  loader.load(&target.model_, true, has_texture, true);
+  target.vbo_ = ci::gl::VboMesh(target.model_);
 
 }
 
