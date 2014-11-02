@@ -5,7 +5,6 @@
 #include "snippets.hpp"
 #include "../include/pose_grabber.hpp"
 
-
 using namespace viz;
 
 inline void clean_string(std::string &str, const std::vector<char> &to_remove){
@@ -35,12 +34,13 @@ void BasePoseGrabber::convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::M
 
 }
 
-PoseGrabber::PoseGrabber(const ConfigReader &reader) {
+PoseGrabber::PoseGrabber(const ConfigReader &reader, const std::string &output_dir) {
 
   self_name_ = "pose-grabber";
   checkSelfName(reader.get_element("name"));
 
   model_.LoadData(reader.get_element("model-file"));
+  
   ifs_.open(reader.get_element("pose-file"));
 
   if (!ifs_.is_open()){
@@ -48,6 +48,12 @@ PoseGrabber::PoseGrabber(const ConfigReader &reader) {
   }
 
   ifs_.exceptions(std::ifstream::eofbit);
+
+  ofs_.open(output_dir + "/" + reader.get_element("output-pose-file"));
+  if (!ofs_.is_open()){
+    throw std::runtime_error("Error, could not open file: " + reader.get_element("pose-file"));
+  }
+
 
 }
 
@@ -91,19 +97,20 @@ void PoseGrabber::LoadPose(const bool no_reload){
 
 }
 
-std::string PoseGrabber::writePoseToString() const {
+void PoseGrabber::WritePoseToStream()  {
 
-  throw std::runtime_error("");
+  ofs_ << model_.Body().transform_ << "\n";
 
-  return "";
+  ofs_ << "\n";
 
 }
 
-std::string PoseGrabber::writePoseToString(const ci::Matrix44f &camera_pose) const {
+void PoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
-  throw std::runtime_error("");
 
-  return "";
+  ofs_ << camera_pose.inverted() * model_.Body().transform_ << "\n";
+
+  ofs_ << "\n";
 
 }
 
@@ -134,7 +141,7 @@ void BaseDaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose
 
 }
 
-DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaVinciPoseGrabber(reader) {
+DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BaseDaVinciPoseGrabber(reader) {
 
   self_name_ = "dh-davinci-grabber";
   checkSelfName(reader.get_element("name"));
@@ -160,7 +167,7 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaV
     break;
   case davinci::DaVinciJoint::ECM:
     num_base_joints_ = chain_.mSUJ3OriginSUJ3Tip.size();
-    num_arm_joints_ = 4;//chain_.mECM1OriginECM1Tip.size(); //alhtough this value is 4 in the file in pratt's code it is 7
+    num_arm_joints_ = 4;//chain_.mECM1OriginECM1Tip.size(); //alhtough this value is 4 in the file in p. pratt's code it is 7
     break;
   }
 
@@ -168,6 +175,13 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaV
   base_offsets_ = std::vector<double>(num_base_joints_, 0.0);
   arm_joints_ = std::vector<double>(num_arm_joints_, 0.0);
   base_joints_ = std::vector<double>(num_base_joints_, 0.0);
+
+  try{
+    SetupOffsets(reader.get_element("base-offsets"), reader.get_element("arm-offsets"));
+  }
+  catch (std::runtime_error &){
+    
+  }
 
   base_ifs_.open(reader.get_element("base-joint-file"));
   if (!base_ifs_.is_open()){
@@ -182,6 +196,38 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader) : BaseDaV
   }
 
   arm_ifs_.exceptions(std::ifstream::eofbit);
+
+  base_ofs_.open(output_dir + "/" + reader.get_element("output-base-joint-file"));
+  if (!base_ofs_.is_open()){
+    throw std::runtime_error("Error, could not open file: " + reader.get_element("output-base-joint-file"));
+  }
+
+  arm_ofs_.open(output_dir + "/" + reader.get_element("output-arm-joint-file"));
+  if (!arm_ofs_.is_open()){
+    throw std::runtime_error("Error, could not open file: " + reader.get_element("output-arm-joint-file"));
+  }
+
+  se3_ofs_.open(output_dir + "/" + reader.get_element("output-se3"));
+  if (!se3_ofs_.is_open()){
+    throw std::runtime_error("Error, could not open file: " + reader.get_element("output-se3"));
+  }
+
+}
+
+void DHDaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets){
+
+  std::stringstream ss;
+  
+  ss << base_offsets;
+  for (size_t i = 0; i < base_offsets_.size(); ++i){
+    ss >> base_offsets_[i];
+  }
+
+  ss.clear();
+  ss << arm_offsets;
+  for (size_t i = 0; i < arm_offsets_.size(); ++i){
+    ss >> arm_offsets_[i];
+  }
 
 }
 
@@ -277,23 +323,47 @@ bool DHDaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_base_joints,
 
 }
 
-std::string DHDaVinciPoseGrabber::writePoseToString() const {
+void DHDaVinciPoseGrabber::WritePoseToStream()  {
 
-  throw std::runtime_error("");
+  se3_ofs_ << model_.Shaft().transform_ << "\n";
+  for (size_t i = 4; i < arm_joints_.size(); ++i){
+    se3_ofs_ << arm_joints_[i] << "\n";
+  }
+  se3_ofs_ << "\n";
 
-  return "";
+  for (size_t i = 0; i < arm_joints_.size(); ++i){
+    arm_ofs_ << arm_joints_[i] + arm_offsets_[i];
+  }
+  arm_ofs_ << "\n";
+
+  for (size_t i = 0; i < base_joints_.size(); ++i){
+    base_ofs_ << base_joints_[i] + base_offsets_[i];
+  }
+  base_ofs_ << "\n";
 
 }
 
-std::string DHDaVinciPoseGrabber::writePoseToString(const ci::Matrix44f &camera_pose) const {
+void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
-  throw std::runtime_error("");
+  se3_ofs_ << camera_pose.inverted() * model_.Shaft().transform_ << "\n";
+  for (size_t i = 4; i < arm_joints_.size(); ++i){
+    se3_ofs_ << arm_joints_[i] << "\n";
+  }
+  se3_ofs_ << "\n";
 
-  return "";
+  for (size_t i = 0; i < arm_joints_.size(); ++i){
+    arm_ofs_ << arm_joints_[i] + arm_offsets_[i];
+  }
+  arm_ofs_ << "\n";
+
+  for (size_t i = 0; i < base_joints_.size(); ++i){
+    base_ofs_ << base_joints_[i] + base_offsets_[i];
+  }
+  base_ofs_ << "\n";
 
 }
 
-SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader) : BaseDaVinciPoseGrabber(reader) {
+SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BaseDaVinciPoseGrabber(reader) {
 
   self_name_ = "se3-davinci-grabber";
   checkSelfName(reader.get_element("name"));
@@ -312,6 +382,11 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader) : BaseD
   num_wrist_joints_ = 3; //should this load from config file?
 
   wrist_dh_params_ = std::vector<double>(num_wrist_joints_, 0.0);
+
+  ofs_.open(output_dir + "/" + reader.get_element("output-pose-file"));
+  if (!ofs_.is_open()){
+    throw std::runtime_error("Error, could not open file: " + reader.get_element("output-pose-file"));
+  }
 
 }
 
@@ -373,18 +448,21 @@ void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
 
 }
 
-std::string SE3DaVinciPoseGrabber::writePoseToString() const {
+void SE3DaVinciPoseGrabber::WritePoseToStream() {
 
-  throw std::runtime_error("");
-
-  return "";
-
+  ofs_ << model_.Shaft().transform_ << "\n";
+  for (size_t i = 0; i < wrist_dh_params_.size(); ++i){
+    ofs_ << wrist_dh_params_[i] << "\n";
+  }
+  ofs_ << "\n";
 }
 
-std::string SE3DaVinciPoseGrabber::writePoseToString(const ci::Matrix44f &camera_pose) const {
+void SE3DaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
-  throw std::runtime_error("");
-
-  return "";
+  ofs_ << camera_pose.inverted() * model_.Shaft().transform_ << "\n";
+  for (size_t i = 0; i < wrist_dh_params_.size(); ++i){
+    ofs_ << wrist_dh_params_[i] << "\n";
+  }
+  ofs_ << "\n";
 
 }

@@ -69,6 +69,9 @@ namespace viz {
     virtual std::vector<ci::Matrix44f> GetTransformSet() const;
     virtual void SetTransformSet(const std::vector<ci::Matrix44f> &transforms);
 
+    RenderData &Body() { return body_; }
+    const RenderData &Body() const { return body_; }
+
   protected:
 
     RenderData body_;
@@ -89,6 +92,11 @@ namespace viz {
     RenderData &Head() { return head_; }
     RenderData &Clasper1() { return clasper1_; }
     RenderData &Clasper2() { return clasper2_; }
+
+    const RenderData &Shaft() const { return shaft_; }
+    const RenderData &Head() const { return head_; }
+    const RenderData &Clasper1() const { return clasper1_; }
+    const RenderData &Clasper2() const { return clasper2_; }
 
   protected:
 

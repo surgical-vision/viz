@@ -16,11 +16,18 @@ VideoIO::VideoIO(const std::string &inpath, const std::string &outpath){
 
 VideoIO::~VideoIO(){
 
+  CloseStreams();
+
+}
+
+void VideoIO::CloseStreams(){
+
   if (cap_.isOpened())
     cap_.release();
 
   if (writer_.isOpened())
     writer_.release();
+
 
 }
 
@@ -33,5 +40,11 @@ cv::Mat VideoIO::Read(){
     f = cv::Mat::zeros(cv::Size(image_width_, image_height_), CV_8UC3);
 
   return f;
+
+}
+
+void VideoIO::Write(const cv::Mat &frame){
+
+  writer_ << frame;
 
 }

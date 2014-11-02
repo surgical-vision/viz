@@ -12,6 +12,8 @@ namespace viz {
     virtual ~VideoIO();
 
     cv::Mat Read();
+    void Write(const cv::Mat &frame);
+    void CloseStreams();
 
   protected:
 

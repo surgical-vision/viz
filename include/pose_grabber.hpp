@@ -49,19 +49,14 @@ namespace viz {
     * Writes the current estimate of pose to a string.
     * @return The formatted version of the current pose.
     */
-    virtual std::string writePoseToString() const = 0;
+    virtual void WritePoseToStream() = 0;
 
+    virtual void WritePoseToStream(const ci::Matrix44f &camera_pose) = 0;
+    
     /**
     * Renders the model to the currently bound framebuffer. Assumes OpenGL context is available on current thread.
     */
     virtual void Draw() const = 0;
-
-    /**
-    * Write this pose grabber's computed pose to an output file with a camera pose transform if this pose should be saved in
-    * camera coordinates.
-    * @return A formatted representation of the object's pose.
-    */
-    virtual std::string writePoseToString(const ci::Matrix44f &camera_pose) const = 0;
 
     /**
     * Get the poses from the previous frames to draw past trajectories.
@@ -105,7 +100,7 @@ namespace viz {
     /**
     * Load a pose grabber from a config file. This file contains the model coordinate file (if applicable) and pose file.
     */
-    explicit PoseGrabber(const ConfigReader &reader);
+    explicit PoseGrabber(const ConfigReader &reader, const std::string &output_dir);
 
     /**
     * Load the next SE3 pose transform from the file. This changes the class' internal representation of its pose when it renders the model.
@@ -114,6 +109,10 @@ namespace viz {
     */
     virtual void LoadPose(const bool no_reload);
     
+    virtual void WritePoseToStream();
+
+    virtual void WritePoseToStream(const ci::Matrix44f &camera_pose);
+
     /**
     * Return the current pose estimate.
     * @return Return the current pose estimate.
@@ -125,23 +124,12 @@ namespace viz {
     */
     virtual void Draw() const { model_.Draw(); }
 
-    /**
-    * Write this pose grabber's computed pose to an output file.
-    * @return A formatted representation of the object's pose.
-    */
-    virtual std::string writePoseToString() const;
-
-    /**
-    * Write this pose grabber's computed pose to an output file with a camera pose transform if this pose should be saved in
-    * camera coordinates.
-    * @return A formatted representation of the object's pose.
-    */
-    virtual std::string writePoseToString(const ci::Matrix44f &camera_pose) const;
-
   protected:
     
     std::ifstream ifs_; /**< The file stream containing the SE3 transforms for each frame. */
     
+    std::ofstream ofs_; /**< The file stream to save the output SE£ transforms (as they may have been modified in the UI or given relative to another reference frame). */
+
     Model model_; /**< The Model to draw for the object. May be empty if for example the PoseGrabber represents a camera. */
 
     ci::Matrix44f cached_model_pose_; /**< Maintain a cache of object pose so that model can be refreshed without reloading. */
@@ -204,7 +192,7 @@ namespace viz {
     * Construct a DH parameter da Vinci manipulator from a configuration file.
     * @param[in] reader A ConfigReader instance which has been initialized from a config file.
     */
-    DHDaVinciPoseGrabber(const ConfigReader &reader);
+    DHDaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir);
 
     /**
     * Load a set of DH parameters from a file and set up the manipulator transforms using the DH chain.
@@ -218,6 +206,10 @@ namespace viz {
     * @return Return the current pose estimate.
     */
     virtual ci::Matrix44f GetPose();
+
+    virtual void WritePoseToStream();
+
+    virtual void WritePoseToStream(const ci::Matrix44f &camera_pose);
 
     /**
     * As the DH parameters collected from the da Vinci joint encoders have some fixed offsets, the offset vectors can be used
@@ -233,20 +225,14 @@ namespace viz {
     */
     std::vector<double> &getBaseOffsets() { return base_offsets_; }
 
-    /**
-    * Write this pose grabber's computed pose to an output file.
-    * @return A formatted representation of the object's pose.
-    */
-    virtual std::string writePoseToString() const;
-
-    /**
-    * Write this pose grabber's computed pose to an output file with a camera pose transform if this pose should be saved in
-    * camera coordinates.
-    * @return A formatted representation of the object's pose.
-    */
-    virtual std::string writePoseToString(const ci::Matrix44f &camera_pose) const;
-
   protected:
+
+    /**
+    * Read the DH values from the files and store them in the vectors.
+    * @param[in] base_offsets The default base offsets to start with (if we've computed them before and want to start playing around with a better estimate.
+    * @param[in] arm_offsets The default arm offsets to start with.
+    */
+    void SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets);
 
     /**
     * Read the DH values from the files and store them in the vectors.
@@ -258,6 +244,10 @@ namespace viz {
 
     std::ifstream base_ifs_; /**< The input file stream for the base joint values. */
     std::ifstream arm_ifs_; /**< The input file stream for the arm joint values. */
+
+    std::ofstream base_ofs_; /**< The output file to save the DH parameters as they may have been modified by the UI */
+    std::ofstream arm_ofs_; /**< */
+    std::ofstream se3_ofs_; /**< */
 
     std::vector<double> arm_offsets_; /**< Arm offset values. */
     std::vector<double> base_offsets_; /**< Base offset values. */
@@ -284,9 +274,13 @@ namespace viz {
     /**
     * Construct from a configuration file.
     * @param[in] reader The configuration file reader containing the data about the instrument.
-    * @param[in] arm The actual arm configuration to use (PSM1, PSM2, ECM...).
+    * @param[in] output_dir The output directory where this session is storing files.
     */
-    SE3DaVinciPoseGrabber(const ConfigReader &reader);
+    SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir);
+
+    virtual void WritePoseToStream();
+
+    virtual void WritePoseToStream(const ci::Matrix44f &camera_pose);
 
     /**
     * Override the pose loader method which normally accepts DH parameters to accept SE3 + DH parameters.
@@ -301,23 +295,12 @@ namespace viz {
     */
     virtual ci::Matrix44f GetPose() { return shaft_pose_; }
 
-    /**
-    * Write this pose grabber's computed pose to an output file. 
-    * @return A formatted representation of the object's pose.
-    */
-    virtual std::string writePoseToString() const;
-
-    /**
-    * Write this pose grabber's computed pose to an output file with a camera pose transform if this pose should be saved in 
-    * camera coordinates.
-    * @return A formatted representation of the object's pose.
-    */
-    virtual std::string writePoseToString(const ci::Matrix44f &camera_pose) const;
-
   protected:
 
     std::size_t num_wrist_joints_; /**< Number of joints in the wrist of the instrument. */
+    
     std::ifstream ifs_; /**< The file to read the DH and SE3 values from. */
+    std::ofstream ofs_; /**< The file to write modified DH and SE3 values to. */
 
     ci::Matrix44f shaft_pose_; /**< Maintain a cache of shaft pose value so that model can be refreshed without reloading. */
     std::vector<double> wrist_dh_params_; /**< Maintain a  */

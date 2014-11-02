@@ -25,13 +25,13 @@ void vizApp::setupFromConfig(const std::string &path){
   camera_.Setup(reader.get_element("root-dir") + "/" + reader.get_element("camera-config"), reader.get_element_as_int("window-width"), reader.get_element_as_int("window-height"), 1, 1000);
 
   try{
-    moveable_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera"))));
-    tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")))); //if there is no moveable camera then there won't be a tracked camera
+    moveable_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera")), reader.get_element("output-dir")));
+    tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")), reader.get_element("output-dir"))); //if there is no moveable camera then there won't be a tracked camera
   }
   catch (std::runtime_error){
     try{
-      moveable_camera_.reset(new DHDaVinciPoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera"))));
-      tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")))); //tracked camera will always be a SE3 tracked, not DH.
+      moveable_camera_.reset(new DHDaVinciPoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera")), reader.get_element("output-dir")));
+      tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")), reader.get_element("output-dir"))); //tracked camera will always be a SE3 tracked, not DH.
     }
     catch (std::runtime_error){
 
@@ -283,11 +283,11 @@ void vizApp::drawCamera(gl::Texture &image_data){
 
 void vizApp::drawCameraTracker(){
 
-  if (!moveable_camera_ || !tracked_camera_) return;
-  if (moveable_camera_->History().size() == 0 || tracked_camera_->History().size() == 0) return;
-
   gl::clear(Color(0.0, 0.0, 0.0));
 
+  if (!moveable_camera_ || !tracked_camera_) return;
+  if (moveable_camera_->History().size() == 0 || tracked_camera_->History().size() == 0) return;
+  
   //set up a camera looking at the 'real' camera origin.
   ci::CameraPersp maya;
   maya.setEyePoint(moveable_camera_->History().back().getTranslate().xyz() + ci::Vec3f(30, 60, 60));
@@ -311,11 +311,11 @@ void vizApp::drawCameraTracker(){
 }
 
 void vizApp::draw3D(gl::Texture &image){
+  
+  gl::clear(Color(0.0, 0.0, 0.0));
 
   if (trackables_.size() == 0) return;
-
-  gl::clear(Color(0.0, 0.0, 0.0));
-  
+    
   ci::CameraPersp maya;
   maya.setEyePoint(trackables_[0]->GetPose().getTranslate().xyz() + ci::Vec3f(30, 100, 190));
   maya.setWorldUp(ci::Vec3f(0, -1, 0));
@@ -367,51 +367,75 @@ void vizApp::draw3D(gl::Texture &image){
 
 void vizApp::saveFrame(gl::Texture texture, bool isLeft){
   
- /* if (!save_next_image_ && !manual_control_toggle_){
+  if (!save_toggle_){
     return;
   }
 
   cv::Mat frame = toOcv(texture), flipped;
   cv::flip(frame, flipped, 0);
-*/
- /* if (isLeft){
-    write_left_ << flipped;
 
-    for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
-      auto &pg = moving_objects_pg_[i];
-      savePoseAsSE3(pg->getSe3FromCamStream(), camera_pg_->getPose(), pg->getPose());
-      savePoseAsSE3(pg->getSe3FromWorldStream(), Pose(ci::Matrix44f()), pg->getPose());
-      savePoseAsSE3AndDH(pg->getSe3AndDHStream(), camera_pg_->getPose(), pg->getPose());
-      saveDH(pg->getSujDHStream(), pg->getJDHStream(), pg->getPose());
-    }
+  //save the video frames
+  if (isLeft){
 
-    savePoseAsSE3(camera_pg_->getSe3FromWorldStream(), Pose(ci::Matrix44f()), camera_pg_->getPose());
-    saveDH(camera_pg_->getSujDHStream(), camera_pg_->getJDHStream(), camera_pg_->getPose());
+    video_left_.Write(flipped);
 
   }
   else{
-    write_right_ << flipped;
-    save_next_image_ = false;
-  }*/
+
+    video_right_.Write(flipped);
+
+  }
+
+
+  //save the pose data - only on the left frame as we don't want it done 2x for both
+  if (isLeft){
+
+    ci::Matrix44f camera_pose; 
+    camera_pose.setToIdentity();
+
+    //need to use the camera pose, if we have one (i.e. it's not just identity) to set the instrument pose
+    if (moveable_camera_){
+      moveable_camera_->WritePoseToStream();
+      camera_pose = moveable_camera_->GetPose();
+    }
+
+    for (std::size_t i = 0; i < trackables_.size(); ++i){
+      trackables_[i]->WritePoseToStream(camera_pose);
+    }
+
+    if (tracked_camera_){
+      tracked_camera_->WritePoseToStream();
+    }
+    
+
+  }
+
+  //if we are running the video on save, just keep saving and don't turn it off after each frame
+  if (!run_video_){
+    save_toggle_ = false;
+  }
 
 }
 
 void vizApp::shutdown(){
 
-  //for (std::size_t i = 0; i < moving_objects_pg_.size(); ++i){
-  //  auto &pg = moving_objects_pg_[i];
-  //  pg->getSe3FromWorldStream().close();
-  //  pg->getSe3FromCamStream().close();
-  //  pg->getSe3AndDHStream().close();
-  //  pg->getSujDHStream().close();
-  //  pg->getJDHStream().close();
-  //}
+  for (size_t i = 0; i < trackables_.size(); ++i){
+
+    trackables_[i].reset();
+
+  }
+
+  if (moveable_camera_) moveable_camera_.reset();
+  if (tracked_camera_) tracked_camera_.reset();
+
+  video_left_.CloseStreams();
+  video_right_.CloseStreams();
 
   AppNative::shutdown();
 
 }
 
-void vizApp::drawTarget(){
+void vizApp::drawTargets(){
 
   for (size_t i = 0; i < trackables_.size(); ++i){
 
@@ -451,7 +475,7 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
     camera_.setupRightCamera(maya_cam_, getCameraPose());
   }
 
-  drawTarget();
+  drawTargets();
   
   gl::popMatrices(); 
 
@@ -467,7 +491,7 @@ void vizApp::loadTrackables(const ConfigReader &reader){
 
       std::stringstream s; 
       s << "trackable-" << i;
-      loadTrackable(reader.get_element("root-dir") + "/" + reader.get_element(s.str()));
+      loadTrackable(reader.get_element("root-dir") + "/" + reader.get_element(s.str()), reader.get_element("output-dir"));
 
     }
     catch (std::runtime_error){
@@ -478,23 +502,23 @@ void vizApp::loadTrackables(const ConfigReader &reader){
 
 }
 
-void vizApp::loadTrackable(const std::string &filepath){
+void vizApp::loadTrackable(const std::string &filepath, const std::string &output_dir){
 
   ConfigReader reader(filepath);
   try{
-    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader)));
+    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
   }
   catch (std::runtime_error){
 
   }
   try{
-    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new SE3DaVinciPoseGrabber(reader)));
+    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new SE3DaVinciPoseGrabber(reader, output_dir)));
   }
   catch (std::runtime_error){
 
   }
   try{
-    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new PoseGrabber(reader)));
+    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new PoseGrabber(reader, output_dir)));
   }
   catch (std::runtime_error){
 
@@ -530,75 +554,6 @@ void vizApp::drawGrid(float size, float step, float plane_position){
   //gl::popModelView();
 }
 
-inline void writePose(std::ofstream &ofs, const std::string &title, const ci::Matrix44d &obj_pose, const ci::Matrix44d &cam_pose){
-  
-  ci::Matrix44d in_cam_coords = cam_pose.inverted() * obj_pose;
-
-  ofs << "#" + title + "\n";
-  ofs << in_cam_coords;
-  ofs << "\n\n";
-
-}
-
-//void vizApp::saveDH(std::ofstream &suj_ofs, std::ofstream &j_ofs, const Pose &pose){
-
-  //for (auto &j_dh : pose.j_dh_vals_){
-  //  j_ofs << j_dh << "\n";
-  //}
-  //j_ofs << "\n";
-
-  //for (auto &suj_dh : pose.suj_dh_vals_){
-  //  suj_ofs << suj_dh << "\n";
-  //}
-  //suj_ofs << "\n";
-
-//}
-
-//void vizApp::savePoseAsSE3(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose){
-
-  //if (pose.poses_.size() != 4 && pose.poses_.size() != 1){
-  //  throw std::runtime_error("Error, there should be 4 poses to call this function");
-  //}
-
-  //if (pose.poses_.size() == 1){
-  //  writePose(ofs, "World to camera transform", pose.poses_[0].first, camera_pose.poses_[0].first);
-  //}
-  //else{
-  // 
-  //  writePose(ofs, "Transform to body", pose.poses_[0].first, camera_pose.poses_[0].first);
-
-  //  writePose(ofs, "Transform to wrist", pose.poses_[1].first, camera_pose.poses_[0].first);
-
-  //  writePose(ofs, "Transform to clasper 1", pose.poses_[2].first, camera_pose.poses_[0].first);
-
-  //  writePose(ofs, "Transform to clasper 2", pose.poses_[3].first, camera_pose.poses_[0].first);
-  //}
-
-//}
-
-//void vizApp::savePoseAsSE3AndDH(std::ofstream &ofs, const Pose &camera_pose, const Pose &pose){
-
- /* if (pose.poses_.size() != 4){
-    throw std::runtime_error("Error, there should be 4 poses to call this function");
-  }
-
-  writePose(ofs, "Camera to body transform", pose.poses_[0].first, camera_pose.poses_[0].first);
-
-  writePose(ofs, "World to body transform", pose.poses_[0].first, ci::Matrix44f());
-  
-  ofs << "# DH parameter from body to wrist \n";
-  ofs << pose.poses_[1].second;
-  ofs << "\n\n";
-
-  ofs << "# DH parameter from wrist to clasper 1 \n";
-  ofs << pose.poses_[2].second;
-  ofs << "\n\n";
-
-  ofs << "# DH parameter from wrist to clasper 2 \n";
-  ofs << pose.poses_[3].second;
-  ofs << "\n\n";*/
-//}
-
 void vizApp::mouseDrag(MouseEvent event){
   // let the camera handle the interaction
   maya_cam_.mouseDrag(event.getPos(), event.isLeftDown(), event.isMiddleDown(), event.isRightDown());
@@ -620,278 +575,275 @@ void vizApp::fileDrop(FileDropEvent event){
 
 }
 
+void vizApp::movePose(KeyEvent event){
+  
+  static int current_model_idx = 0;
+
+  //set the index of the model we want to track
+  if (std::isdigit(event.getChar())){
+    std::stringstream ss;
+    ss << event.getChar();
+      ss >> current_model_idx;
+      return;
+   }
+
+
+  if (current_model_idx == 0){
+    applyOffsetToCamera(event);
+  }
+  else{
+    applyOffsetToTrackedObject(event, current_model_idx);
+  }
+     
+}
+
 void vizApp::keyDown(KeyEvent event){
 
   if (event.getChar() == ' '){
     load_next_image_ = true;
     return;
   }
-  //else if (event.getChar() == 'j'){
-  //  draw2 = !draw2;
-  //  return;
-  //}
-  //else if (event.getChar() == 'k'){
-  //  draw3 = !draw3;
-  //  return;
-  //}
+
   else if (event.getChar() == 's'){
     save_toggle_ = !save_toggle_;
     return;
   }
-  //else if (event.getChar() == 'a'){
-  //  draw3d = !draw3d;
-  //  return;
-  //}
+  
   else if (event.getCode() == KeyEvent::KEY_ESCAPE){
     shutdown();
   }
-  //else if (event.getChar() == 'd'){
-  //  manual_control_toggle_ = !manual_control_toggle_;
-  //}
-  //
-  //static int current_model_idx = 0;
+  
+  else if (event.getChar() == 'd'){
+    run_video_ = !run_video_;
+  }
 
-  //if (std::isdigit(event.getChar())){
-  //  std::stringstream ss;
-  //  ss << event.getChar();
-  //  ss >> current_model_idx;
-  //  return;
-  //}
+  else if (event.getChar() == 'f'){
+    update_toggle_ = !update_toggle_;
+  }
 
-
-  //if (current_model_idx == 0){
-  //  applyOffsetToCamera(event);
-  //}
-  //else{
-  //  if (current_model_idx - 1 >= moving_objects_pg_.size()){
-  //    console() << "Error, this index is too large for the vector!" << std::endl;
-  //    return;
-  //  }
-  //  boost::shared_ptr< DaVinciPoseGrabber > grabber;
-  //  try{
-  //    grabber = moving_objects_pg_[current_model_idx-1]->getDVPoseGrabber();
-  //    if (grabber.get() == 0x0) return;
-  //    applyOffsetToTrackedObject(event, grabber);
-
-  //  }
-  //  catch (...){
-  //    return;
-  //  }
-
-
-  //}
-  // 
+  movePose(event);
 
 }
 
 void vizApp::applyOffsetToCamera(KeyEvent &event){
 
-  /*boost::shared_ptr<std::vector<double> > offsets = camera_pg_->getDVPoseGrabber()->getOffsets();
-  boost::shared_ptr<std::vector<double> > base_offsets = camera_pg_->getDVPoseGrabber()->getBaseOffsets();
+  double suj_offset = 0.004;
+  double j_offset = 0.001;
+  
+  boost::shared_ptr<DHDaVinciPoseGrabber> grabber;
+  try{
+
+    grabber = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(moveable_camera_);
+
+  }
+  catch (boost::bad_lexical_cast &){
+
+    return;
+
+  }
+
+  std::vector<double> &arm_offset = grabber->getArmOffsets();
+  std::vector<double> &base_offset = grabber->getBaseOffsets();
+
+  //the base offsets
+  if (event.getChar() == 'q'){
+    base_offset[0] += suj_offset;
+  }
+  else if (event.getChar() == 'w'){
+    base_offset[1] += suj_offset;
+  }
+  else if (event.getChar() == 'e'){
+    base_offset[2] += suj_offset;
+  }
+  else if (event.getChar() == 'r'){
+    base_offset[3] += suj_offset;
+  }
+  else if (event.getChar() == 't'){
+    base_offset[4] += suj_offset;
+  }
+  else if (event.getChar() == 'y'){
+    base_offset[5] += suj_offset;
+  }
+  else if (event.getChar() == 'Q'){
+    base_offset[0] -= suj_offset;
+  }
+  else if (event.getChar() == 'W'){
+    base_offset[1] -= suj_offset;
+  }
+  else if (event.getChar() == 'E'){
+    base_offset[2] -= suj_offset;
+  }
+  else if (event.getChar() == 'R'){
+    base_offset[3] -= suj_offset;
+  }
+  else if (event.getChar() == 'T'){
+    base_offset[4] -= suj_offset;
+  }
+  else if (event.getChar() == 'Y'){
+    base_offset[5] -= suj_offset;
+  }
+
+
+  //the arm offset
+  else if (event.getChar() == 'z'){
+    arm_offset[0] += suj_offset;
+  }
+  else if (event.getChar() == 'x'){
+    arm_offset[1] += suj_offset;
+  }
+  else if (event.getChar() == 'c'){
+    arm_offset[2] += suj_offset;
+  }
+  else if (event.getChar() == 'v'){
+    arm_offset[3] += suj_offset;
+  }
+  else if (event.getChar() == 'Z'){
+    arm_offset[0] -= suj_offset;
+  }
+  else if (event.getChar() == 'X'){
+    arm_offset[1] -= suj_offset;
+  }
+  else if (event.getChar() == 'C'){
+    arm_offset[2] -= suj_offset;
+  }
+  else if (event.getChar() == 'V'){
+    arm_offset[3] -= suj_offset;
+  }
+
+  console() << "Camera base offset is:\n[";
+  for (size_t i = 0; i < base_offset.size(); ++i){
+    console() << base_offset[i];
+    if (i != base_offset.size() - 1)  console() << ", ";
+  }
+  console() << "]\n";
+  console() << "Camera arm offset is:\n[";
+  for (size_t i = 0; i < arm_offset.size(); ++i){
+    console() << arm_offset[i];
+    if (i != arm_offset.size() - 1)  console() << ", ";
+  }
+  console() << "]" << std::endl;
+
+}
+
+void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model_idx){
+
+  int model_idx = current_model_idx - 1; //as the camera is idx zero
+
+  if ((size_t)model_idx >= trackables_.size()) return;
+
+  boost::shared_ptr<DHDaVinciPoseGrabber> grabber;
+  try{
+  
+     grabber = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[model_idx]);
+  
+  }
+  catch (boost::bad_lexical_cast &){
+    
+    return;
+  
+  }
+
+  std::vector<double> &arm_offset = grabber->getArmOffsets();
+  std::vector<double> &base_offset = grabber->getBaseOffsets();
 
   double suj_offset = 0.004;
   double j_offset = 0.001;
-  if (manual_control_toggle_){
-    suj_offset = 0.001;
-    j_offset = 0.0004;
-  }
 
-
-  if (offsets->size() == 0)
-    return;
-
+  //the base offsets
   if (event.getChar() == 'q'){
-    (*offsets)[0] += suj_offset;
+    base_offset[0] += suj_offset;
   }
   else if (event.getChar() == 'w'){
-    (*offsets)[1] += suj_offset;
+    base_offset[1] += suj_offset;
   }
   else if (event.getChar() == 'e'){
-    (*offsets)[2] += suj_offset;
+    base_offset[2] += suj_offset;
   }
   else if (event.getChar() == 'r'){
-    (*offsets)[3] += suj_offset;
+    base_offset[3] += suj_offset;
   }
-  else if (event.getChar() == 'z'){
-    (*offsets)[0] -= suj_offset;
+  else if (event.getChar() == 't'){
+    base_offset[4] += suj_offset;
   }
-  else if (event.getChar() == 'x'){
-    (*offsets)[1] -= suj_offset;
+  else if (event.getChar() == 'y'){
+    base_offset[5] += suj_offset;
   }
-  else if (event.getChar() == 'c'){
-    (*offsets)[2] -= suj_offset;
-  }
-  else if (event.getChar() == 'v'){
-    (*offsets)[3] -= suj_offset;
-  }
- 
-
-  if (event.getChar() == 'Q'){
-    (*base_offsets)[0] += j_offset;
+  else if (event.getChar() == 'Q'){
+    base_offset[0] -= suj_offset;
   }
   else if (event.getChar() == 'W'){
-    (*base_offsets)[1] += j_offset;
+    base_offset[1] -= suj_offset;
   }
   else if (event.getChar() == 'E'){
-    (*base_offsets)[2] += j_offset;
+    base_offset[2] -= suj_offset;
   }
   else if (event.getChar() == 'R'){
-    (*base_offsets)[3] += j_offset;
+    base_offset[3] -= suj_offset;
   }
   else if (event.getChar() == 'T'){
-    (*base_offsets)[4] += j_offset;
+    base_offset[4] -= suj_offset;
   }
   else if (event.getChar() == 'Y'){
-    (*base_offsets)[5] += j_offset;
+    base_offset[5] -= suj_offset;
   }
 
+
+  //the arm offset
+  else if (event.getChar() == 'z'){
+    arm_offset[0] += suj_offset;
+  }
+  else if (event.getChar() == 'x'){
+    arm_offset[1] += suj_offset;
+  }
+  else if (event.getChar() == 'c'){
+    arm_offset[2] += suj_offset;
+  }
+  else if (event.getChar() == 'v'){
+    arm_offset[3] += suj_offset;
+  }
+  else if (event.getChar() == 'b'){
+    arm_offset[4] += suj_offset;
+  }
+  else if (event.getChar() == 'n'){
+    arm_offset[5] += suj_offset;
+  }
+  else if (event.getChar() == 'm'){
+    arm_offset[6] += suj_offset;
+  }
   else if (event.getChar() == 'Z'){
-    (*base_offsets)[0] -= j_offset;
+    arm_offset[0] -= suj_offset;
   }
   else if (event.getChar() == 'X'){
-    (*base_offsets)[1] -= j_offset;
+    arm_offset[1] -= suj_offset;
   }
   else if (event.getChar() == 'C'){
-    (*base_offsets)[2] -= j_offset;
+    arm_offset[2] -= suj_offset;
   }
   else if (event.getChar() == 'V'){
-    (*base_offsets)[3] -= j_offset;
+    arm_offset[3] -= suj_offset;
   }
   else if (event.getChar() == 'B'){
-    (*base_offsets)[4] -= j_offset;
+    arm_offset[4] -= suj_offset;
   }
   else if (event.getChar() == 'N'){
-    (*base_offsets)[5] -= j_offset;
+    arm_offset[5] -= suj_offset;
+  }
+  else if (event.getChar() == 'M'){
+    arm_offset[6] -= suj_offset;
   }
 
-
-
-  if (offsets != nullptr){
-    ci::app::console() << "Offset = [ ";
-    for (auto i : *offsets){
-      ci::app::console() << i << ", ";
-    }
-    ci::app::console() << "]" << std::endl;
-
-    ci::app::console() << "Base Offset = [ ";
-    for (auto i : *base_offsets){
-      ci::app::console() << i << ", ";
-    }
-    ci::app::console() << "]" << std::endl;
+  console() << "Trackable " << model_idx << " base offset is : \n[";
+  for (size_t i = 0; i < base_offset.size(); ++i){
+    console() << base_offset[i];
+    if (i != base_offset.size() - 1)  console() << ", ";
   }
-  */
+  console() << "]\n";
+  console() << "Trackable " << model_idx << " offset is : \n[";
+  for (size_t i = 0; i < arm_offset.size(); ++i){
+    console() << arm_offset[i];
+    if (i != arm_offset.size() - 1)  console() << ", ";
+  }
+  console() << "]" << std::endl;
+
 }
 
-//void vizApp::applyOffsetToTrackedObject(KeyEvent &event, boost::shared_ptr<DaVinciPoseGrabber> grabber){
-//
-//  boost::shared_ptr<std::vector<double> > offsets = grabber->getOffsets();
-//  boost::shared_ptr<std::vector<double> > base_offsets = grabber->getBaseOffsets();
-//
-//  if (offsets->size() == 0)
-//    return;
-//
-//  double suj_offset = 0.004;
-//  double j_offset = 0.001;
-//  if (manual_control_toggle_){
-//    suj_offset = 0.001;
-//    j_offset = 0.0004;
-//  }
-//
-//  if (event.getChar() == 'q'){
-//    (*offsets)[0] += suj_offset;
-//  }
-//  else if (event.getChar() == 'w'){
-//    (*offsets)[1] += suj_offset;
-//  }
-//  else if (event.getChar() == 'e'){
-//    (*offsets)[2] += suj_offset;
-//  }
-//  else if (event.getChar() == 'r'){
-//    (*offsets)[3] += suj_offset;
-//  }
-//  else if (event.getChar() == 't'){
-//    (*offsets)[4] += suj_offset;
-//  }
-//  else if (event.getChar() == 'y'){
-//    (*offsets)[5] += suj_offset;
-//  }
-//  else if (event.getChar() == 'u'){
-//    (*offsets)[6] += suj_offset;
-//  }
-//
-//  else if (event.getChar() == 'z'){
-//    (*offsets)[0] -= suj_offset;
-//  }
-//  else if (event.getChar() == 'x'){
-//    (*offsets)[1] -= suj_offset;
-//  }
-//  else if (event.getChar() == 'c'){
-//    (*offsets)[2] -= suj_offset;
-//  }
-//  else if (event.getChar() == 'v'){
-//    (*offsets)[3] -= suj_offset;
-//  }
-//  else if (event.getChar() == 'b'){
-//    (*offsets)[4] -= suj_offset;
-//  }
-//  else if (event.getChar() == 'n'){
-//    (*offsets)[5] -= suj_offset;
-//  }
-//  else if (event.getChar() == 'm'){
-//    (*offsets)[6] -= suj_offset;
-//  }
-//
-//  if (event.getChar() == 'Q'){
-//    (*base_offsets)[0] += j_offset;
-//  }
-//  else if (event.getChar() == 'W'){
-//    (*base_offsets)[1] += j_offset;
-//  }
-//  else if (event.getChar() == 'E'){
-//    (*base_offsets)[2] += j_offset;
-//  }
-//  else if (event.getChar() == 'R'){
-//    (*base_offsets)[3] += j_offset;
-//  }
-//  else if (event.getChar() == 'T'){
-//    (*base_offsets)[4] += j_offset;
-//  }
-//  else if (event.getChar() == 'Y'){
-//    (*base_offsets)[5] += j_offset;
-//  }
-//
-//  else if (event.getChar() == 'Z'){
-//    (*base_offsets)[0] -= j_offset;
-//  }
-//  else if (event.getChar() == 'X'){
-//    (*base_offsets)[1] -= j_offset;
-//  }
-//  else if (event.getChar() == 'C'){
-//    (*base_offsets)[2] -= j_offset;
-//  }
-//  else if (event.getChar() == 'V'){
-//    (*base_offsets)[3] -= j_offset;
-//  }
-//  else if (event.getChar() == 'B'){
-//    (*base_offsets)[4] -= j_offset;
-//  }
-//  else if (event.getChar() == 'N'){
-//    (*base_offsets)[5] -= j_offset;
-//  }
-//
-//
-//
-//  if (offsets != nullptr){
-//    ci::app::console() << "Offset = [ ";
-//    for (auto i : *offsets){
-//      ci::app::console() << i << ", ";
-//    }
-//    ci::app::console() << "]" << std::endl;
-//
-//    ci::app::console() << "Base Offset = [ ";
-//    for (auto i : *base_offsets){
-//      ci::app::console() << i << ", ";
-//    }
-//    ci::app::console() << "]" << std::endl;
-//  }
-//}
