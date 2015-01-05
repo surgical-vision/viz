@@ -90,8 +90,6 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
   left_camera_matrix.at<double>(1, 2) = image_height - left_camera_matrix.at<double>(1, 2);
   right_camera_matrix.at<double>(1, 2) = image_height - right_camera_matrix.at<double>(1, 2);
 
-  ci::app::console() << "Extrinsic transformation from file = " << extrinsic_rotation << "\n\n" << extrinsic_translation << "\n";
-
   extrinsic_rotation = extrinsic_rotation.inv();
   extrinsic_translation = extrinsic_translation * -1;
 

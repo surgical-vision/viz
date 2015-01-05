@@ -8,6 +8,17 @@
 
 using namespace viz;
 
+/**
+* Usage guide: 
+*
+* Space to move to the next frame of video, loading the next pose value from the pose files.
+* 's' to save the current frame of video and the computed pose values.
+* 'd' to save the current frame of video and then load the next frame until 'd' is hit again.
+* 'l' to work with a synthetic video where the movement at each frame is done entirely from 
+* keyboard updates
+*
+*/
+
 void vizApp::setupFromConfig(const std::string &path){
   
   ConfigReader reader(path);
@@ -64,34 +75,34 @@ void vizApp::setup(){
 
   std::vector<std::string> cmd_line_args = getArgs();
 
+  run_video_ = false;
+  save_toggle_ = false;
+  update_toggle_ = false;
+  synthetic_save_ = false;
+
   if (cmd_line_args.size() == 2){
     
     try{
       setupFromConfig(cmd_line_args[1]);
+      return;
     }
     catch (std::runtime_error){
       ci::app::console() << "Error, input file is bad!\n";
     }
 
   }
-  else{
   
-    camera_image_width_ = 640;
-    camera_image_height_ = 480;
-    three_dim_viz_width_ = 500;
-    three_dim_viz_height_ = 500;
+  
+  camera_image_width_ = 640;
+  camera_image_height_ = 480;
+  three_dim_viz_width_ = 500;
+  three_dim_viz_height_ = 500;
+  
+  framebuffer_ = gl::Fbo(camera_image_width_, camera_image_height_);
+  framebuffer_3d_ = gl::Fbo(three_dim_viz_width_, three_dim_viz_height_);
 
-    framebuffer_ = gl::Fbo(camera_image_width_, camera_image_height_);
-    framebuffer_3d_ = gl::Fbo(three_dim_viz_width_, three_dim_viz_height_);
-
-    setWindowSize((2 * framebuffer_.getWidth()), framebuffer_.getHeight() + framebuffer_3d_.getHeight());
-    load_next_image_ = false;
-
-  }
-
-  run_video_ = false;
-  save_toggle_ = false;
-  update_toggle_ = false;
+  setWindowSize((2 * framebuffer_.getWidth()), framebuffer_.getHeight() + framebuffer_3d_.getHeight());
+  load_next_image_ = false;
 
 }
 
@@ -118,9 +129,19 @@ void vizApp::update(){
     cv::Mat left_frame = video_left_.Read();
     cv::Mat right_frame = video_right_.Read();
 
-    left_texture_ = fromOcv(left_frame);
-    right_texture_ = fromOcv(right_frame);
-    load_next_image_ = false;
+    if (!video_left_.CanRead() || !video_right_.CanRead()){
+
+      run_video_ = false;
+
+    }
+    else{
+
+      left_texture_ = fromOcv(left_frame);
+      right_texture_ = fromOcv(right_frame);
+      load_next_image_ = false;
+
+    }
+    
   }
 
 }
@@ -321,7 +342,6 @@ void vizApp::draw3D(gl::Texture &image){
   maya.setWorldUp(ci::Vec3f(0, -1, 0));
   maya.lookAt(trackables_[0]->GetPose().getTranslate().xyz());// ci::Vec3f(0, 0, 5));
   
-
   gl::pushMatrices();
   gl::setMatrices(maya);
 
@@ -367,7 +387,7 @@ void vizApp::draw3D(gl::Texture &image){
 
 void vizApp::saveFrame(gl::Texture texture, bool isLeft){
   
-  if (!save_toggle_){
+  if (!save_toggle_ && !synthetic_save_){
     return;
   }
 
@@ -474,7 +494,7 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
   else{
     camera_.setupRightCamera(maya_cam_, getCameraPose());
   }
-
+  
   drawTargets();
   
   gl::popMatrices(); 
@@ -507,18 +527,21 @@ void vizApp::loadTrackable(const std::string &filepath, const std::string &outpu
   ConfigReader reader(filepath);
   try{
     trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
+    return;
   }
   catch (std::runtime_error){
 
   }
   try{
     trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new SE3DaVinciPoseGrabber(reader, output_dir)));
+    return;
   }
   catch (std::runtime_error){
 
   }
   try{
     trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new PoseGrabber(reader, output_dir)));
+    return;
   }
   catch (std::runtime_error){
 
@@ -583,8 +606,8 @@ void vizApp::movePose(KeyEvent event){
   if (std::isdigit(event.getChar())){
     std::stringstream ss;
     ss << event.getChar();
-      ss >> current_model_idx;
-      return;
+    ss >> current_model_idx;
+    return;
    }
 
 
@@ -614,11 +637,16 @@ void vizApp::keyDown(KeyEvent event){
   }
   
   else if (event.getChar() == 'd'){
+    save_toggle_ = !save_toggle_;
     run_video_ = !run_video_;
   }
 
   else if (event.getChar() == 'f'){
     update_toggle_ = !update_toggle_;
+  }
+
+  else if (event.getChar() == 'l'){
+    synthetic_save_ = !synthetic_save_;
   }
 
   movePose(event);
@@ -630,6 +658,8 @@ void vizApp::applyOffsetToCamera(KeyEvent &event){
   double suj_offset = 0.004;
   double j_offset = 0.001;
   
+  if (moveable_camera_ == nullptr) return;
+
   boost::shared_ptr<DHDaVinciPoseGrabber> grabber;
   try{
 
@@ -743,11 +773,15 @@ void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model
   
   }
 
+  if (grabber == nullptr) return;
+
   std::vector<double> &arm_offset = grabber->getArmOffsets();
   std::vector<double> &base_offset = grabber->getBaseOffsets();
 
-  double suj_offset = 0.004;
-  double j_offset = 0.001;
+  double suj_offset = 0.0004;
+  double j_offset = 0.0001;
+
+  const int SCALE_FACTOR = 5;
 
   //the base offsets
   if (event.getChar() == 'q'){
@@ -787,7 +821,6 @@ void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model
     base_offset[5] -= suj_offset;
   }
 
-
   //the arm offset
   else if (event.getChar() == 'z'){
     arm_offset[0] += suj_offset;
@@ -799,16 +832,16 @@ void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model
     arm_offset[2] += suj_offset;
   }
   else if (event.getChar() == 'v'){
-    arm_offset[3] += suj_offset;
+    arm_offset[3] += SCALE_FACTOR * suj_offset;
   }
   else if (event.getChar() == 'b'){
-    arm_offset[4] += suj_offset;
+    arm_offset[4] += SCALE_FACTOR * suj_offset;
   }
   else if (event.getChar() == 'n'){
-    arm_offset[5] += suj_offset;
+    arm_offset[5] += SCALE_FACTOR * suj_offset;
   }
   else if (event.getChar() == 'm'){
-    arm_offset[6] += suj_offset;
+    arm_offset[6] += SCALE_FACTOR * suj_offset;
   }
   else if (event.getChar() == 'Z'){
     arm_offset[0] -= suj_offset;
@@ -820,16 +853,16 @@ void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model
     arm_offset[2] -= suj_offset;
   }
   else if (event.getChar() == 'V'){
-    arm_offset[3] -= suj_offset;
+    arm_offset[3] -= SCALE_FACTOR * suj_offset;
   }
   else if (event.getChar() == 'B'){
-    arm_offset[4] -= suj_offset;
+    arm_offset[4] -= SCALE_FACTOR * suj_offset;
   }
   else if (event.getChar() == 'N'){
-    arm_offset[5] -= suj_offset;
+    arm_offset[5] -= SCALE_FACTOR * suj_offset;
   }
   else if (event.getChar() == 'M'){
-    arm_offset[6] -= suj_offset;
+    arm_offset[6] -= SCALE_FACTOR * suj_offset;
   }
 
   console() << "Trackable " << model_idx << " base offset is : \n[";

@@ -28,13 +28,13 @@ set(
   HEADERS
   ${INCDIR}/camera.hpp ${INCDIR}/config_reader.hpp
   ${INCDIR}/pose_grabber.hpp ${INCDIR}/davinci.hpp
-  ${INCDIR}/resources.hpp ${INCDIR}/snippets.hpp ${INCDIR}/trackable.hpp
-  ${INCDIR}/vizApp.hpp 
+  ${INCDIR}/resources.hpp ${INCDIR}/snippets.hpp 
+  ${INCDIR}/vizApp.hpp  ${INCDIR}/video.hpp
   ${INCDIR}/model.hpp
 )
 
 ## Store list of source files
-set( SOURCES camera.cpp davinci.cpp pose_grabber.cpp trackable.cpp snippets.cpp vizApp.cpp model.cpp )
+set( SOURCES camera.cpp davinci.cpp pose_grabber.cpp video.cpp snippets.cpp vizApp.cpp model.cpp )
 
 #######################################################
 ## User build options

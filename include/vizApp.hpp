@@ -171,6 +171,7 @@ namespace viz {
     bool save_toggle_; /**< Toggle to set saving of all data from the visualizer (poses and video frames). */
     bool update_toggle_; /**< Toggle to set whether the updates load from the file or just refresh. Useful for instance if manual offsets are being applied to pose of trackables in the UI and you want to draw these new poses. */
 
+    bool synthetic_save_;
 
   };
 

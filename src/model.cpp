@@ -40,8 +40,6 @@ void BaseModel::InternalDraw(const RenderData &rd) const {
 
   ci::gl::pushModelView();
 
-  ci::app::console() << "transform = \n" << rd.transform_ << std::endl;
-
   ci::gl::multModelView(rd.transform_);
 
   glEnable(GL_COLOR_MATERIAL); //cinder uses colors rather than materials which are ignore by lighting unless you do this call.

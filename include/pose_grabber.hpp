@@ -129,6 +129,7 @@ namespace viz {
     std::ifstream ifs_; /**< The file stream containing the SE3 transforms for each frame. */
     
     std::ofstream ofs_; /**< The file stream to save the output SE£ transforms (as they may have been modified in the UI or given relative to another reference frame). */
+    std::string ofs_file_; /**< The actual file to write to, this allows delayed opening. */
 
     Model model_; /**< The Model to draw for the object. May be empty if for example the PoseGrabber represents a camera. */
 
@@ -245,9 +246,13 @@ namespace viz {
     std::ifstream base_ifs_; /**< The input file stream for the base joint values. */
     std::ifstream arm_ifs_; /**< The input file stream for the arm joint values. */
 
-    std::ofstream base_ofs_; /**< The output file to save the DH parameters as they may have been modified by the UI */
-    std::ofstream arm_ofs_; /**< */
-    std::ofstream se3_ofs_; /**< */
+    std::ofstream base_ofs_; /**< The output file to save the base DH parameters as they may have been modified by the UI */
+    std::ofstream arm_ofs_; /**< The output file to save the arm DH parameters as they may have been modified by the UI */
+    std::ofstream se3_ofs_; /**< The output file to save the SE3 parameters as they may have been modified by the UI */
+    
+    std::string base_ofs_file_; /**< The actual base DH file to write to, this allows delayed opening. */
+    std::string arm_ofs_file_; /**< The actual arm DH file to write to, this allows delayed opening. */
+    std::string se3_ofs_file_; /**< The actual SE3 file to write to, this allows delayed opening. */
 
     std::vector<double> arm_offsets_; /**< Arm offset values. */
     std::vector<double> base_offsets_; /**< Base offset values. */
@@ -301,6 +306,7 @@ namespace viz {
     
     std::ifstream ifs_; /**< The file to read the DH and SE3 values from. */
     std::ofstream ofs_; /**< The file to write modified DH and SE3 values to. */
+    std::string ofs_file_; /** The file name to write to. Allows delayed opening. */
 
     ci::Matrix44f shaft_pose_; /**< Maintain a cache of shaft pose value so that model can be refreshed without reloading. */
     std::vector<double> wrist_dh_params_; /**< Maintain a  */

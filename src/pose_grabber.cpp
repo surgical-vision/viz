@@ -49,11 +49,7 @@ PoseGrabber::PoseGrabber(const ConfigReader &reader, const std::string &output_d
 
   ifs_.exceptions(std::ifstream::eofbit);
 
-  ofs_.open(output_dir + "/" + reader.get_element("output-pose-file"));
-  if (!ofs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + reader.get_element("pose-file"));
-  }
-
+  ofs_file_ = output_dir + "/" + reader.get_element("output-pose-file");
 
 }
 
@@ -99,6 +95,9 @@ void PoseGrabber::LoadPose(const bool no_reload){
 
 void PoseGrabber::WritePoseToStream()  {
 
+  if (!ofs_.is_open()) ofs_.open(ofs_file_);
+  if (!ofs_.is_open()) throw(std::runtime_error("Error, cannot open file"));
+
   ofs_ << model_.Body().transform_ << "\n";
 
   ofs_ << "\n";
@@ -107,6 +106,8 @@ void PoseGrabber::WritePoseToStream()  {
 
 void PoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
+  if (!ofs_.is_open()) ofs_.open(ofs_file_);
+  if (!ofs_.is_open()) throw(std::runtime_error("Error, cannot open file"));
 
   ofs_ << camera_pose.inverted() * model_.Body().transform_ << "\n";
 
@@ -197,21 +198,17 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader, const std
 
   arm_ifs_.exceptions(std::ifstream::eofbit);
 
-  base_ofs_.open(output_dir + "/" + reader.get_element("output-base-joint-file"));
-  if (!base_ofs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + reader.get_element("output-base-joint-file"));
+  base_ofs_file_ = output_dir + "/" + reader.get_element("output-base-joint-file");
+  arm_ofs_file_ = output_dir + "/" + reader.get_element("output-arm-joint-file");
+  try{
+    se3_ofs_file_ = output_dir + "/" + reader.get_element("output-se3-file");
+  }
+  catch (...){
+    se3_ofs_file_ = output_dir + "/" + reader.get_element("output-se3"); //stupid old code 
   }
 
-  arm_ofs_.open(output_dir + "/" + reader.get_element("output-arm-joint-file"));
-  if (!arm_ofs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + reader.get_element("output-arm-joint-file"));
-  }
-
-  se3_ofs_.open(output_dir + "/" + reader.get_element("output-se3"));
-  if (!se3_ofs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + reader.get_element("output-se3"));
-  }
-
+  //getting weird errors here. check that output-se3-file is defined
+  
 }
 
 void DHDaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets){
@@ -325,19 +322,27 @@ bool DHDaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_base_joints,
 
 void DHDaVinciPoseGrabber::WritePoseToStream()  {
 
+  if (!se3_ofs_.is_open()) se3_ofs_.open(se3_ofs_file_);
+  if (!arm_ofs_.is_open()) arm_ofs_.open(arm_ofs_file_);
+  if (!base_ofs_.is_open()) base_ofs_.open(base_ofs_file_);
+  if (!se3_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
+  if (!arm_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
+  if (!base_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
+
+
   se3_ofs_ << model_.Shaft().transform_ << "\n";
   for (size_t i = 4; i < arm_joints_.size(); ++i){
-    se3_ofs_ << arm_joints_[i] << "\n";
+    se3_ofs_ << arm_joints_[i] + arm_offsets_[i] << "\n";
   }
   se3_ofs_ << "\n";
 
   for (size_t i = 0; i < arm_joints_.size(); ++i){
-    arm_ofs_ << arm_joints_[i] + arm_offsets_[i];
+    arm_ofs_ << arm_joints_[i] + arm_offsets_[i] << " ";
   }
   arm_ofs_ << "\n";
 
   for (size_t i = 0; i < base_joints_.size(); ++i){
-    base_ofs_ << base_joints_[i] + base_offsets_[i];
+    base_ofs_ << base_joints_[i] + base_offsets_[i] << " ";
   }
   base_ofs_ << "\n";
 
@@ -345,19 +350,26 @@ void DHDaVinciPoseGrabber::WritePoseToStream()  {
 
 void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
+  if (!se3_ofs_.is_open()) se3_ofs_.open(se3_ofs_file_);
+  if (!arm_ofs_.is_open()) arm_ofs_.open(arm_ofs_file_);
+  if (!base_ofs_.is_open()) base_ofs_.open(base_ofs_file_);
+  if (!se3_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
+  if (!arm_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
+  if (!base_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
+
   se3_ofs_ << camera_pose.inverted() * model_.Shaft().transform_ << "\n";
   for (size_t i = 4; i < arm_joints_.size(); ++i){
-    se3_ofs_ << arm_joints_[i] << "\n";
+    se3_ofs_ << arm_joints_[i] + arm_offsets_[i] << "\n";
   }
   se3_ofs_ << "\n";
 
   for (size_t i = 0; i < arm_joints_.size(); ++i){
-    arm_ofs_ << arm_joints_[i] + arm_offsets_[i];
+    arm_ofs_ << arm_joints_[i] + arm_offsets_[i] << " ";
   }
   arm_ofs_ << "\n";
 
   for (size_t i = 0; i < base_joints_.size(); ++i){
-    base_ofs_ << base_joints_[i] + base_offsets_[i];
+    base_ofs_ << base_joints_[i] + base_offsets_[i] << " ";
   }
   base_ofs_ << "\n";
 
@@ -378,15 +390,11 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
     throw std::runtime_error("Error, bad joint");
 
   ifs_.open(reader.get_element("pose-file"));
+  ofs_file_ = output_dir + "/" + reader.get_element("output-pose-file");
 
   num_wrist_joints_ = 3; //should this load from config file?
 
   wrist_dh_params_ = std::vector<double>(num_wrist_joints_, 0.0);
-
-  ofs_.open(output_dir + "/" + reader.get_element("output-pose-file"));
-  if (!ofs_.is_open()){
-    throw std::runtime_error("Error, could not open file: " + reader.get_element("output-pose-file"));
-  }
 
 }
 
@@ -450,6 +458,9 @@ void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
 
 void SE3DaVinciPoseGrabber::WritePoseToStream() {
 
+  if (!ofs_.is_open()) ofs_.open(ofs_file_);
+  if (!ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
+
   ofs_ << model_.Shaft().transform_ << "\n";
   for (size_t i = 0; i < wrist_dh_params_.size(); ++i){
     ofs_ << wrist_dh_params_[i] << "\n";
@@ -458,6 +469,9 @@ void SE3DaVinciPoseGrabber::WritePoseToStream() {
 }
 
 void SE3DaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
+
+  if (!ofs_.is_open()) ofs_.open(ofs_file_);
+  if (!ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
 
   ofs_ << camera_pose.inverted() * model_.Shaft().transform_ << "\n";
   for (size_t i = 0; i < wrist_dh_params_.size(); ++i){
