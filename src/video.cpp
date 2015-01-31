@@ -1,16 +1,26 @@
 #include "../include/video.hpp"
 #include <opencv2/highgui/highgui_c.h>
+#include <boost/filesystem.hpp>
 
 using namespace viz;
 
 
 VideoIO::VideoIO(const std::string &inpath, const std::string &outpath){
 
-  cap_.open(inpath);
-  if (!cap_.isOpened()) throw std::runtime_error("Error, could not open input video file");
-  image_width_ = cap_.get(cv::CAP_PROP_FRAME_WIDTH);
-  image_height_ = cap_.get(cv::CAP_PROP_FRAME_HEIGHT);
-
+  if (boost::filesystem::path(inpath).extension().string() == ".png" ||
+    boost::filesystem::path(inpath).extension().string() == ".jpg" ||
+    boost::filesystem::path(inpath).extension().string() == ".jpeg" ||
+    boost::filesystem::path(inpath).extension().string() == ".bmp"){
+    image_input_ = cv::imread(inpath);
+    image_width_ = image_input_.cols;
+    image_height_ = image_input_.rows;
+  }
+  else{
+    cap_.open(inpath);
+    if (!cap_.isOpened()) throw std::runtime_error("Error, could not open input video file");
+    image_width_ = cap_.get(cv::CAP_PROP_FRAME_WIDTH);
+    image_height_ = cap_.get(cv::CAP_PROP_FRAME_HEIGHT);
+  }
   
   writer_.open(outpath, CV_FOURCC('D','I','B',' '), 25, cv::Size(image_width_, image_height_));
 

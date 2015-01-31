@@ -30,8 +30,23 @@ void vizApp::setupFromConfig(const std::string &path){
     boost::filesystem::create_directory(reader.get_element("output-dir"));
   }
 
-  video_left_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("left-input-video"), reader.get_element("output-dir") + "/" + reader.get_element("left-output-video"));
-  video_right_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("right-input-video"), reader.get_element("output-dir") + "/" + reader.get_element("right-output-video"));
+  std::string output_dir_this_run;
+  for (int n = 0; n < 100; ++n){
+    std::stringstream ss;
+    ss << reader.get_element("output-dir") << "/output" << n;
+    boost::filesystem::path output_dir(ss.str());
+    if (!boost::filesystem::is_directory(output_dir)){
+      boost::filesystem::create_directory(output_dir);
+      output_dir_this_run = output_dir.string();
+      break;
+    }
+  }
+
+  if (output_dir_this_run == "")
+    throw std::runtime_error("Error, this should not be empty!");
+
+  video_left_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("left-input-video"), output_dir_this_run + "/" + reader.get_element("left-output-video"));
+  video_right_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("right-input-video"), output_dir_this_run + "/" + reader.get_element("right-output-video"));
 
   camera_.Setup(reader.get_element("root-dir") + "/" + reader.get_element("camera-config"), reader.get_element_as_int("window-width"), reader.get_element_as_int("window-height"), 1, 1000);
 
@@ -41,8 +56,8 @@ void vizApp::setupFromConfig(const std::string &path){
   }
   catch (std::runtime_error){
     try{
-      moveable_camera_.reset(new DHDaVinciPoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera")), reader.get_element("output-dir")));
-      tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")), reader.get_element("output-dir"))); //tracked camera will always be a SE3 tracked, not DH.
+      moveable_camera_.reset(new DHDaVinciPoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera")), output_dir_this_run));
+      tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")), output_dir_this_run)); //tracked camera will always be a SE3 tracked, not DH.
     }
     catch (std::runtime_error){
 
@@ -373,6 +388,7 @@ void vizApp::draw3D(gl::Texture &image){
   
   for (size_t i = 0; i < trackables_.size(); ++i){
 
+    trackables_[i]->GetPose(); //update the pose if needed
     trackables_[i]->Draw();
 
   }
@@ -757,6 +773,9 @@ void vizApp::applyOffsetToCamera(KeyEvent &event){
 
 void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model_idx){
 
+  //top row is SUJ
+  //bottom row is J
+
   int model_idx = current_model_idx - 1; //as the camera is idx zero
 
   if ((size_t)model_idx >= trackables_.size()) return;
@@ -823,25 +842,25 @@ void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model
 
   //the arm offset
   else if (event.getChar() == 'z'){
-    arm_offset[0] += suj_offset;
+    arm_offset[0] += j_offset;
   }
   else if (event.getChar() == 'x'){
-    arm_offset[1] += suj_offset;
+    arm_offset[1] += j_offset;
   }
   else if (event.getChar() == 'c'){
-    arm_offset[2] += suj_offset;
+    arm_offset[2] += j_offset;
   }
   else if (event.getChar() == 'v'){
-    arm_offset[3] += SCALE_FACTOR * suj_offset;
+    arm_offset[3] += SCALE_FACTOR * j_offset;
   }
   else if (event.getChar() == 'b'){
-    arm_offset[4] += SCALE_FACTOR * suj_offset;
+    arm_offset[4] += SCALE_FACTOR * j_offset;
   }
   else if (event.getChar() == 'n'){
-    arm_offset[5] += SCALE_FACTOR * suj_offset;
+    arm_offset[5] += SCALE_FACTOR * j_offset;
   }
   else if (event.getChar() == 'm'){
-    arm_offset[6] += SCALE_FACTOR * suj_offset;
+    arm_offset[6] += SCALE_FACTOR * j_offset;
   }
   else if (event.getChar() == 'Z'){
     arm_offset[0] -= suj_offset;
@@ -853,16 +872,16 @@ void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model
     arm_offset[2] -= suj_offset;
   }
   else if (event.getChar() == 'V'){
-    arm_offset[3] -= SCALE_FACTOR * suj_offset;
+    arm_offset[3] -= SCALE_FACTOR * j_offset;
   }
   else if (event.getChar() == 'B'){
-    arm_offset[4] -= SCALE_FACTOR * suj_offset;
+    arm_offset[4] -= SCALE_FACTOR * j_offset;
   }
   else if (event.getChar() == 'N'){
-    arm_offset[5] -= SCALE_FACTOR * suj_offset;
+    arm_offset[5] -= SCALE_FACTOR * j_offset;
   }
   else if (event.getChar() == 'M'){
-    arm_offset[6] -= SCALE_FACTOR * suj_offset;
+    arm_offset[6] -= SCALE_FACTOR * j_offset;
   }
 
   console() << "Trackable " << model_idx << " base offset is : \n[";

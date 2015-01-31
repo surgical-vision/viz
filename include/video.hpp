@@ -19,6 +19,7 @@ namespace viz {
 
   protected:
 
+    cv::Mat image_input_;
     cv::VideoCapture cap_;
     cv::VideoWriter writer_;
     
