@@ -1,3 +1,8 @@
+/*
+Modified from original by Philip Pratt, Imperial College London
+*/
+
+
 #include "api_stream.h"
 #include "pose_grabber.hpp"
 #include "davinci.hpp"

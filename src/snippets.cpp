@@ -1,7 +1,9 @@
 #include "snippets.hpp"
 #include <cinder/app/App.h>
 
-/******************************************************************************************************************************/
+/*
+Modified from original by Philip Pratt, Imperial College London
+*/
 
 // OpenGL matrix offsets
 #define _00 0
@@ -145,46 +147,6 @@ void extendChain(const DenavitHartenbergFrame& frame, GLdouble* A, float angle =
 void buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, const API_PSM& psm, ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2)
 {
 
-  //GLdouble A[16];
-  //glhSetIdentity(A);
-
-  //extendChain(mDaVinciChain.mWorldOriginSUJ2Origin[0], A);
-  //extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[0], A, psm.sj_joint_angles[0]);
-  //extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[1], A, psm.sj_joint_angles[1]);
-  //extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[2], A, psm.sj_joint_angles[2]);
-  //extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[3], A, psm.sj_joint_angles[3]);
-  //extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[4], A, psm.sj_joint_angles[4]);
-  //extendChain(mDaVinciChain.mSUJ2OriginSUJ2Tip[5], A, psm.sj_joint_angles[5]);
-
-  //extendChain(mDaVinciChain.mSUJ2TipPSM2Origin[0], A);
-  //extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[0], A, psm.jnt_pos[0]);
-  //extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[1], A, psm.jnt_pos[1]);
-  //extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[2], A, psm.jnt_pos[2]);
-
-  //extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[3], A, psm.jnt_pos[3]);
-  //roll = ci::Matrix44d(A);
-
-  //extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[4], A, psm.jnt_pos[4]);
-  //wrist_pitch = ci::Matrix44d(A);
-
-  ////don't actually care about wrist yaw as the clasper pose 'contains' this information
-  //extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[5], A, psm.jnt_pos[5]);
-  //ci::Matrix44d wrist_yaw = ci::Matrix44d(A);
-
-  ////transform into the clasper reference frame
-  //extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A, 0);  //no dh param here as this just points in the direction of the instrument head
-
-  ////rotate the instrument claspers around the clasper axis 
-  //grip1 = ci::Matrix44d(A);
-  //grip2 = ci::Matrix44d(A);
-
-  ////this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
-  //float val = psm.jnt_pos[6];
-  //grip1.rotate(ci::Vec3f(0.0f, 1.0f, 0.0f), 0.5f*val);
-
-  //grip2.rotate(ci::Vec3f(0.0f, 0.0f, 1.0f), (float)M_PI);
-  //grip2.rotate(ci::Vec3f(0.0f, 1.0f, 0.0f), 0.5*val);
-
   GLdouble A[16];
   glhSetIdentity(A);
 
@@ -229,9 +191,6 @@ void buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, const API_PSM
   //grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
   glhMultMatrixRight(test.m, grip1d.m);
 
-
-  //grip2.rotate(ci::Vec3d(0, 0, 1), M_PI);
-  //grip2.rotate(ci::Vec3d(0, 1, 0), -0.5*val);
   test.setToIdentity();
   test = test.createRotation(ci::Vec3f(0, 1, 0), -0.5*val);
   glhMultMatrixRight(test.m, grip2d.m);
