@@ -2,23 +2,16 @@
 Modified from original by Philip Pratt, Imperial College London
 */
 
-
 #include "davinci.hpp"
 
 using namespace viz::davinci;
 
-float PI = 3.14159265358979323846f;
-float PI_2 = 1.57079632679489661923f;
-float PI_4 = 0.785398163397448309616f;
-
+const float PI = 3.14159265358979323846f;
+const float PI_2 = 1.57079632679489661923f;
+const float PI_4 = 0.785398163397448309616f;
 
 DaVinciKinematicChain::DaVinciKinematicChain(void){
   
-  // Standard angles
-  float PI = 3.14159265358979323846f;
-  float PI_2 = 1.57079632679489661923f;
-  float PI_4 = 0.785398163397448309616f;
-
   // General transformation from world origin to SUJ1 origin (assumes alpha cart)
   mWorldOriginSUJ1Origin.push_back(GeneralFrame(-0.1016f, -0.1016f, 0.43f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 

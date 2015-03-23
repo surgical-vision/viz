@@ -99,7 +99,7 @@ include_directories( ${USER_INC} )
 link_directories( ${USER_LIB} )
 
 #if(_WIN_)
-add_executable(${BINARY_NAME} WIN32 ${MAIN_FILE} ${SOURCES} ${HEADERS} )
+add_executable(${BINARY_NAME} WIN32 "../resources/Resources.rc" ${MAIN_FILE} ${SOURCES} ${HEADERS} )
 #else(_WIN_)
 #add_executable(${BINARY_NAME} ${MAIN_FILE} ${SOURCES} ${HEADERS} )
 #endif

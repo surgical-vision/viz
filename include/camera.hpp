@@ -71,6 +71,9 @@ namespace viz {
     void TurnOnLight();
     void TurnOffLight();
 
+    const Camera &GetLeftCamera() { return left_eye_; }
+    const Camera &GetRightCamera() { return right_eye_; }
+
   protected:
 
     void moveEyeToLeftCam(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);

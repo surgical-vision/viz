@@ -1,6 +1,8 @@
 #include <CinderOpenCV.h>
 #include <locale>
-#include <opencv2/highgui.hpp>
+#include <cinder/gl/Vbo.h>
+
+#include <opencv2/highgui/highgui.hpp>
 
 #include "../include/config_reader.hpp"
 #include "../include/vizApp.hpp"
@@ -45,14 +47,20 @@ void vizApp::setupFromConfig(const std::string &path){
   if (output_dir_this_run == "")
     throw std::runtime_error("Error, this should not be empty!");
 
-  video_left_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("left-input-video"), output_dir_this_run + "/" + reader.get_element("left-output-video"));
-  video_right_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("right-input-video"), output_dir_this_run + "/" + reader.get_element("right-output-video"));
+  try{
+    video_left_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("left-input-video"), output_dir_this_run + "/" + reader.get_element("left-output-video"));
+    video_right_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("right-input-video"), output_dir_this_run + "/" + reader.get_element("right-output-video"));
+  } catch (...){
+    stereo_video_ = VideoIO(reader.get_element("root-dir") + "/" + reader.get_element("stereo-input-video"), output_dir_this_run + "/" + reader.get_element("stereo-output-video"));
+  }
+
+
 
   camera_.Setup(reader.get_element("root-dir") + "/" + reader.get_element("camera-config"), reader.get_element_as_int("window-width"), reader.get_element_as_int("window-height"), 1, 1000);
 
   try{
-    moveable_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera")), reader.get_element("output-dir")));
-    tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")), reader.get_element("output-dir"))); //if there is no moveable camera then there won't be a tracked camera
+    moveable_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("moveable-camera")), output_dir_this_run));
+    tracked_camera_.reset(new PoseGrabber(ConfigReader(reader.get_element("root-dir") + "/" + reader.get_element("tracked-camera")), output_dir_this_run)); //if there is no moveable camera then there won't be a tracked camera
   }
   catch (std::runtime_error){
     try{
@@ -65,7 +73,7 @@ void vizApp::setupFromConfig(const std::string &path){
   }
   
   try{
-    loadTrackables(reader);
+    loadTrackables(reader, output_dir_this_run);
   }
   catch (std::runtime_error){
 
@@ -77,13 +85,15 @@ void vizApp::setupFromConfig(const std::string &path){
   three_dim_viz_width_ = reader.get_element_as_int("viz-width");
   three_dim_viz_height_ = reader.get_element_as_int("viz-height");
 
+  writer_.open("z:/vizport.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(three_dim_viz_width_, three_dim_viz_height_));
+
   framebuffer_ = gl::Fbo(camera_image_width_, camera_image_height_);
   framebuffer_3d_ = gl::Fbo(three_dim_viz_width_, three_dim_viz_height_);
 
   setWindowSize((2 * framebuffer_.getWidth()), framebuffer_.getHeight() + framebuffer_3d_.getHeight());
 
   load_next_image_ = true;
-
+  loaded_ = true;
 }
 
 void vizApp::setup(){
@@ -94,6 +104,11 @@ void vizApp::setup(){
   save_toggle_ = false;
   update_toggle_ = false;
   synthetic_save_ = false;
+  done_ = false;
+  loaded_ = false;
+  save_viewport_data_ = false;
+
+  shader_ = gl::GlslProg(loadResource(RES_SHADER_VERT), loadResource(RES_SHADER_FRAG));
 
   if (cmd_line_args.size() == 2){
     
@@ -106,8 +121,7 @@ void vizApp::setup(){
     }
 
   }
-  
-  
+ 
   camera_image_width_ = 640;
   camera_image_height_ = 480;
   three_dim_viz_width_ = 500;
@@ -122,7 +136,6 @@ void vizApp::setup(){
 }
 
 void vizApp::update(){
-
  
   /**
   * update the trackable object and camera poses.
@@ -130,34 +143,80 @@ void vizApp::update(){
   * this sets internal offset parameters inside the objects so their pose needs to be 'refreshed' to get the offset values.
   */
   if (load_next_image_ || run_video_ || update_toggle_){
-
-    if (moveable_camera_) moveable_camera_->LoadPose(update_toggle_);
-    if (tracked_camera_) tracked_camera_->LoadPose(update_toggle_);
+    if (moveable_camera_){
+      if (!moveable_camera_->LoadPose(update_toggle_)){
+        done_ = true;
+        shutdown();
+        quit();
+        return;
+      }
+    }
+    if (tracked_camera_){
+      if (!tracked_camera_->LoadPose(update_toggle_)){
+        done_ = true;
+        shutdown();
+        quit();
+        return;
+      }
+    }
     for (size_t i = 0; i < trackables_.size(); ++i){
-      trackables_[i]->LoadPose(update_toggle_);
+      if (!trackables_[i]->LoadPose(update_toggle_)){
+        done_ = true;
+        shutdown();
+        quit();
+        return;
+      }
     }
   }
 
   if (load_next_image_ || run_video_){
+
+    //static size_t i = 1;
+    //ci::app::console() << "Loading frame " << i << std::endl;
+    //++i;
+
     cv::Mat stereo_image;
 
-    cv::Mat left_frame = video_left_.Read();
-    cv::Mat right_frame = video_right_.Read();
+    cv::Mat left_frame; 
+    cv::Mat right_frame;
 
-    if (!video_left_.CanRead() || !video_right_.CanRead()){
+    if (video_left_.IsOpen() && video_right_.IsOpen()){
+
+      left_frame = video_left_.Read();
+      right_frame = video_right_.Read();
+
+
+    }
+    else if (stereo_video_.IsOpen()){
+
+      stereo_video_.Read(left_frame, right_frame);
+
+    }
+
+
+    if ((video_left_.IsOpen() && (!video_left_.CanRead() || !video_right_.CanRead())) || ((stereo_video_.IsOpen() && !stereo_video_.CanRead())) ){
 
       run_video_ = false;
+      done_ = true;
+      shutdown();
+      quit();
 
     }
     else{
 
-      left_texture_ = fromOcv(left_frame);
-      right_texture_ = fromOcv(right_frame);
+      cv::Mat resized_left, resized_right;
+      cv::resize(left_frame, resized_left, cv::Size(camera_.GetLeftCamera().getImageWidth(), camera_.GetLeftCamera().getImageHeight()));
+      cv::resize(right_frame, resized_right, cv::Size(camera_.GetRightCamera().getImageWidth(), camera_.GetRightCamera().getImageHeight()));
+
+      left_texture_ = fromOcv(resized_left);
+      right_texture_ = fromOcv(resized_right);
       load_next_image_ = false;
 
     }
     
   }
+
+
 
 }
 
@@ -198,29 +257,47 @@ void vizApp::draw2D(gl::Texture &tex){
 
 void vizApp::draw(){
 
+  if (done_) return;
+
+  if (!loaded_) return;
+
   gl::clear( Color( 0, 0, 0 ) ); 
+
+  static size_t count = 0;
 
   framebuffer_.bindFramebuffer();
   drawEye(left_texture_, true);
   framebuffer_.unbindFramebuffer();
   gl::draw(framebuffer_.getTexture(), ci::Rectf(0.0, (float)framebuffer_.getHeight(), (float)framebuffer_.getWidth(), 0.0));
+  
   saveFrame(framebuffer_.getTexture(), true); //remember only saves when save_next_frame_ is true, right call turns this off
 
-  gl::Texture test_fb = framebuffer_.getTexture();
-  cv::Mat i = toOcv(test_fb);
-  gl::Texture copy = fromOcv(i);
+  cv::Mat l = toOcv(left_texture_);
+  cv::Mat r = toOcv(right_texture_);
+  gl::Texture left_copy = fromOcv(l);
+  gl::Texture right_copy = fromOcv(r);
 
   framebuffer_.bindFramebuffer();
   drawEye(right_texture_, false);
   framebuffer_.unbindFramebuffer();
   gl::draw(framebuffer_.getTexture(), ci::Rectf((float)framebuffer_.getWidth(), (float)framebuffer_.getHeight(), 2.0 * framebuffer_.getWidth(), 0.0));
   saveFrame(framebuffer_.getTexture(), false); //remember only saves when save_next_frame_ is true, right call turns this off
-
+  
   framebuffer_3d_.bindFramebuffer();
-  draw3D(copy);
+  draw3D(left_copy, right_copy);
   framebuffer_3d_.unbindFramebuffer();
   gl::draw(framebuffer_3d_.getTexture(), ci::Rectf(0.0, (float)framebuffer_.getHeight() + (float)framebuffer_3d_.getHeight(), (float)framebuffer_3d_.getWidth(), (float)framebuffer_.getHeight())); 
 
+  if (!save_toggle_ && !synthetic_save_){
+
+  }
+  else{
+    cv::Mat frame = toOcv(framebuffer_3d_.getTexture());
+    cv::Mat fframe; cv::flip(frame, fframe, 0);
+    //writer_ << fframe;
+  }
+
+  
   framebuffer_3d_.bindFramebuffer();
   drawCameraTracker();
   framebuffer_3d_.unbindFramebuffer();
@@ -240,7 +317,7 @@ void vizApp::drawTrajectories(const std::vector<ci::Matrix44f> &transforms, ci::
 
   gl::multModelView(transforms.back());
   
-  drawCamera(gl::Texture());
+  drawCamera(gl::Texture(), gl::Texture());
 
   gl::popModelView();
 
@@ -279,42 +356,75 @@ void vizApp::drawImageOnCamera(gl::Texture &image_data, ci::Vec3f &tl, ci::Vec3f
   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
-void vizApp::drawCamera(gl::Texture &image_data){
+void vizApp::drawCamera(gl::Texture &left_image_data, gl::Texture &right_image_data){
   
-  ci::Vec3f vertex[8];
-  
-  ci::Vec3f eye(0, 0, 0);
-  ci::Vec3f bottom_left(-5, -5, 20);
-  ci::Vec3f bottom_right(5, -5, 20);
-  ci::Vec3f top_left(-5, 5, 20);
-  ci::Vec3f top_right(5, 5, 20);
+  ci::Vec3f left_cam_center(0, 0, 0);
+  ci::Vec3f left_cam_bottom_left(-5, -5, 20);
+  ci::Vec3f left_cam_bottom_right(5, -5, 20);
+  ci::Vec3f left_cam_top_left(-5, 5, 20);
+  ci::Vec3f left_cam_top_right(5, 5, 20);
+
+  ci::Vec3f left_to_right_translate(11, 0, 0);
+  ci::Vec3f right_cam_center = left_cam_center + left_to_right_translate;
+  ci::Vec3f right_cam_bottom_left = left_cam_bottom_left + left_to_right_translate;
+  ci::Vec3f right_cam_bottom_right = left_cam_bottom_right + left_to_right_translate;
+  ci::Vec3f right_cam_top_left = left_cam_top_left + left_to_right_translate;
+  ci::Vec3f right_cam_top_right = left_cam_top_right + left_to_right_translate;
  
-  if (image_data)
-    drawImageOnCamera(image_data, top_left, bottom_left, top_right, bottom_right);
+  if (left_image_data && right_image_data){
+    drawImageOnCamera(left_image_data, left_cam_top_left, left_cam_bottom_left, left_cam_top_right, left_cam_bottom_right);
+    drawImageOnCamera(right_image_data, right_cam_top_left, right_cam_bottom_left, right_cam_top_right, right_cam_bottom_right);
+  }
+
+  ci::Vec3f vertex[8];
+  //ci::Vec4<unsigned char> color[8];
 
   glEnableClientState(GL_VERTEX_ARRAY);
+  //glEnableClientState(GL_COLOR_ARRAY);
   glVertexPointer(3, GL_FLOAT, 0, &vertex[0].x);
+  //glColorPointer(3, GL_UNSIGNED_BYTE, 0, &color[0].x);
 
-  vertex[0] = eye;
-  vertex[1] = bottom_left;
-  vertex[2] = eye;
-  vertex[3] = bottom_right;
-  vertex[4] = eye;
-  vertex[5] = top_left;
-  vertex[6] = eye;
-  vertex[7] = top_right;
+  vertex[0] = left_cam_center;
+  vertex[1] = left_cam_bottom_left;
+  vertex[2] = left_cam_center;
+  vertex[3] = left_cam_bottom_right;
+  vertex[4] = left_cam_center;
+  vertex[5] = left_cam_top_left;
+  vertex[6] = left_cam_center;
+  vertex[7] = left_cam_top_right;
+
+  //for (int i = 0; i < 8; ++i) color[i] = ci::Vec3<unsigned char>(255, 255, 255);
+
+  glDrawArrays(GL_LINES, 0, 8);
+
+  vertex[0] = right_cam_center;
+  vertex[1] = right_cam_bottom_left;
+  vertex[2] = right_cam_center;
+  vertex[3] = right_cam_bottom_right;
+  vertex[4] = right_cam_center;
+  vertex[5] = right_cam_top_left;
+  vertex[6] = right_cam_center;
+  vertex[7] = right_cam_top_right;
+
   glDrawArrays(GL_LINES, 0, 8);
 
   glLineWidth(2.0f);
-  vertex[0] = bottom_left;
-  vertex[1] = bottom_right;
-  vertex[2] = top_right;
-  vertex[3] = top_left;
+  vertex[0] = left_cam_bottom_left;
+  vertex[1] = left_cam_bottom_right;
+  vertex[2] = left_cam_top_right;
+  vertex[3] = left_cam_top_left;
+  glDrawArrays(GL_LINE_LOOP, 0, 4);
+
+  vertex[0] = right_cam_bottom_left;
+  vertex[1] = right_cam_bottom_right;
+  vertex[2] = right_cam_top_right;
+  vertex[3] = right_cam_top_left;
   glDrawArrays(GL_LINE_LOOP, 0, 4);
 
   glLineWidth(1.0f);
   glDisableClientState(GL_VERTEX_ARRAY);
-
+  //glDisableClientState(GL_COLOR_ARRAY);
+  
 }
 
 void vizApp::drawCameraTracker(){
@@ -346,20 +456,27 @@ void vizApp::drawCameraTracker(){
 
 }
 
-void vizApp::draw3D(gl::Texture &image){
+void vizApp::draw3D(gl::Texture &left_image, gl::Texture &right_image){
   
-  gl::clear(Color(0.0, 0.0, 0.0));
+  gl::clear(Color(0.15, 0.15, 0.15));
+  //gl::clear(Color(1.0, 1.0, 1.0));
 
   if (trackables_.size() == 0) return;
     
-  ci::CameraPersp maya;
-  maya.setEyePoint(trackables_[0]->GetPose().getTranslate().xyz() + ci::Vec3f(30, 100, 190));
-  maya.setWorldUp(ci::Vec3f(0, -1, 0));
-  maya.lookAt(trackables_[0]->GetPose().getTranslate().xyz());// ci::Vec3f(0, 0, 5));
-  
-  gl::pushMatrices();
-  gl::setMatrices(maya);
+  ci::Vec3f eye_point = trackables_[0]->GetPose().getTranslate().xyz() + ci::Vec3f(77.7396, -69.9107, -150.47f);
 
+  static bool first = true;
+  if (first){
+    ci::CameraPersp maya;
+    maya.setEyePoint(eye_point);
+    maya.setOrientation(ci::Quatf(ci::Vec3f(0.977709, -0.0406959, 0.205982), 2.75995));
+    maya_cam_2_.setCurrentCam(maya);
+  }
+  first = false;
+
+  gl::pushMatrices();
+  gl::setMatrices(maya_cam_2_.getCamera());
+  
   //drawGrid(5000, 1, first_camera_pose.getTranslate().xyz()[2] - 200);
 
   ci::Area viewport = gl::getViewport();
@@ -370,9 +487,13 @@ void vizApp::draw3D(gl::Texture &image){
     gl::pushModelView();
     gl::multModelView(moveable_camera_->GetPose());
     camera_.TurnOnLight();
-    drawCamera(image);
+    drawCamera(left_image, right_image);
     gl::popModelView();
 
+  }
+  else{
+    camera_.TurnOnLight();
+    drawCamera(left_image, right_image);
   }
   
 
@@ -380,12 +501,15 @@ void vizApp::draw3D(gl::Texture &image){
 
     gl::pushModelView();
     gl::multModelView(tracked_camera_->GetPose());
-    drawCamera(image);
+    drawCamera(left_image, right_image);
     gl::popModelView();
 
   }
 
   
+  shader_.bind();
+  shader_.uniform("tex0", 0);
+
   for (size_t i = 0; i < trackables_.size(); ++i){
 
     trackables_[i]->GetPose(); //update the pose if needed
@@ -393,11 +517,16 @@ void vizApp::draw3D(gl::Texture &image){
 
   }
 
-  if (moveable_camera_)
-    camera_.TurnOffLight();
+  shader_.unbind();
+
+  //if (moveable_camera_)
+  camera_.TurnOffLight();
 
   gl::setViewport(viewport);
   gl::popMatrices();
+
+
+
 
 }
 
@@ -413,12 +542,17 @@ void vizApp::saveFrame(gl::Texture texture, bool isLeft){
   //save the video frames
   if (isLeft){
 
-    video_left_.Write(flipped);
+    if (video_left_.IsOpen())
+      video_left_.Write(flipped);
+    else if (stereo_video_.IsOpen()){
+      stereo_video_.Write(flipped, cv::Mat::zeros(flipped.size(), CV_8UC3));
+    }
 
   }
   else{
 
-    video_right_.Write(flipped);
+    //if (video_right_.IsOpen())
+    //  video_right_.Write(flipped);
 
   }
 
@@ -511,7 +645,12 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
     camera_.setupRightCamera(maya_cam_, getCameraPose());
   }
   
+  shader_.bind();
+  shader_.uniform("tex0", 0);
+
   drawTargets();
+
+  shader_.unbind();
   
   gl::popMatrices(); 
 
@@ -519,7 +658,7 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
 
 }
 
-void vizApp::loadTrackables(const ConfigReader &reader){
+void vizApp::loadTrackables(const ConfigReader &reader, const std::string &output_dir_this_run){
 
   for (int i = 0;; ++i){
 
@@ -527,7 +666,7 @@ void vizApp::loadTrackables(const ConfigReader &reader){
 
       std::stringstream s; 
       s << "trackable-" << i;
-      loadTrackable(reader.get_element("root-dir") + "/" + reader.get_element(s.str()), reader.get_element("output-dir"));
+      loadTrackable(reader.get_element("root-dir") + "/" + reader.get_element(s.str()), output_dir_this_run);
 
     }
     catch (std::runtime_error){
@@ -595,16 +734,18 @@ void vizApp::drawGrid(float size, float step, float plane_position){
 
 void vizApp::mouseDrag(MouseEvent event){
   // let the camera handle the interaction
-  maya_cam_.mouseDrag(event.getPos(), event.isLeftDown(), event.isMiddleDown(), event.isRightDown());
+  mouse_pos_ = event.getPos();
+  maya_cam_2_.mouseDrag(event.getPos(), event.isLeftDown(), event.isMiddleDown(), event.isRightDown());
 }
 
 void vizApp::mouseDown(MouseEvent event){
-  maya_cam_.mouseDown(event.getPos());
+  maya_cam_2_.mouseDown(event.getPos());
 }
 
 void vizApp::fileDrop(FileDropEvent event){
 
   try{
+
     for (int i = 0; i < event.getNumFiles(); ++i)
       setupFromConfig(event.getFile(i).string());
   }
@@ -619,7 +760,7 @@ void vizApp::movePose(KeyEvent event){
   static int current_model_idx = 0;
 
   //set the index of the model we want to track
-  if (std::isdigit(event.getChar())){
+  if (std::isdigit(event.getChar(), std::locale())){
     std::stringstream ss;
     ss << event.getChar();
     ss >> current_model_idx;
@@ -634,6 +775,11 @@ void vizApp::movePose(KeyEvent event){
     applyOffsetToTrackedObject(event, current_model_idx);
   }
      
+}
+
+void vizApp::mouseMove(MouseEvent m_event){
+  // keep track of the mouse
+  mouse_pos_ = m_event.getPos();
 }
 
 void vizApp::keyDown(KeyEvent event){
@@ -663,6 +809,10 @@ void vizApp::keyDown(KeyEvent event){
 
   else if (event.getChar() == 'l'){
     synthetic_save_ = !synthetic_save_;
+  }
+
+  else if (event.getChar() == 'p'){
+    save_viewport_data_ = true;
   }
 
   movePose(event);

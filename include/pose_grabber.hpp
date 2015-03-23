@@ -29,10 +29,10 @@ namespace viz {
     
     /**
     * Load the next pose value from the file. This changes the class' internal representation of its pose when it renders the model.
-    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
-    * UI to account for a rigid offset.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.
+    * @return The success of the load (false if for instance there are no poses left to read from the file).
     */
-    virtual void LoadPose(const bool no_reload) = 0;
+    virtual bool LoadPose(const bool no_reload) = 0;
     
     /**
     * Return the current pose estimate.
@@ -104,10 +104,10 @@ namespace viz {
 
     /**
     * Load the next SE3 pose transform from the file. This changes the class' internal representation of its pose when it renders the model.
-    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
-    * UI to account for a rigid offset.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.
+    * @return The success of the load (false if for instance there are no poses left to read from the file).
     */
-    virtual void LoadPose(const bool no_reload);
+    virtual bool LoadPose(const bool no_reload);
     
     virtual void WritePoseToStream();
 
@@ -155,10 +155,10 @@ namespace viz {
 
     /**
     * Load the next pose value from the file. This changes the class' internal representation of its pose when it renders the model.
-    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
-    * UI to account for a rigid offset.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.
+    * @return The success of the load (false if for instance there are no poses left to read from the file).
     */
-    virtual void LoadPose(const bool no_reload) = 0;
+    virtual bool LoadPose(const bool no_reload) = 0;
 
     /**
     * Renders the model to the currently bound framebuffer. Assumes OpenGL context is available on current thread.
@@ -197,10 +197,10 @@ namespace viz {
 
     /**
     * Load a set of DH parameters from a file and set up the manipulator transforms using the DH chain.
-    * @param[in] no_reloa d Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
-    * UI to account for a rigid offset.
+    * @param[in] no_reloa d Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within th UI to account for a rigid offset.
+    * @return The success of the load (false if for instance there are no poses left to read from the file).
     */
-    virtual void LoadPose(const bool no_reload);
+    virtual bool LoadPose(const bool no_reload);
 
     /**
     * Return the current pose estimate.
@@ -289,10 +289,10 @@ namespace viz {
 
     /**
     * Override the pose loader method which normally accepts DH parameters to accept SE3 + DH parameters.
-    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the
-    * UI to account for a rigid offset.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.    
+    * @return The success of the load (false if for instance there are no poses left to read from the file).
     */
-    virtual void LoadPose(const bool no_reload);
+    virtual bool LoadPose(const bool no_reload);
 
     /**
     * Return the current pose estimate.

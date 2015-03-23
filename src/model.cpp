@@ -40,13 +40,20 @@ void BaseModel::InternalDraw(const RenderData &rd) const {
 
   ci::gl::pushModelView();
 
-  ci::gl::multModelView(rd.transform_);
+  ci::Matrix44f f = rd.transform_;
+  ci::Matrix44f reflection;
+  reflection.setToIdentity();
+  /*reflection.at(0, 0) *= -1;*/
 
-  glEnable(GL_COLOR_MATERIAL); //cinder uses colors rather than materials which are ignore by lighting unless you do this call.
+  ci::gl::multModelView(reflection*f);
+
+  rd.texture_.enableAndBind();
+  //glEnable(GL_COLOR_MATERIAL); //cinder uses colors rather than materials which are ignore by lighting unless you do this call.
   
   ci::gl::draw(rd.vbo_);
 
-  glDisable(GL_COLOR_MATERIAL);
+  rd.texture_.unbind();
+  //glDisable(GL_COLOR_MATERIAL);
 
   ci::gl::popModelView();
 
@@ -62,7 +69,8 @@ void BaseModel::LoadComponent(const ci::JsonTree &tree, BaseModel::RenderData &t
 
   boost::filesystem::path tex_file = boost::filesystem::path(root_dir) / boost::filesystem::path(tree["texture"].getValue<std::string>());
   bool has_texture = false;
-  //if (!boost::filesystem::exists(tex_file)) throw(std::runtime_error("Error, the file doens't exist!\n"));
+  if (!boost::filesystem::exists(tex_file)) throw(std::runtime_error("Error, the file doens't exist!\n"));
+  
   if (has_texture = boost::filesystem::exists(tex_file)){
     ci::gl::Texture::Format format;
     format.enableMipmapping(true);

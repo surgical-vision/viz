@@ -205,7 +205,7 @@ void buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciChain, const AP
 
   ci::Matrix44d A = roll;
 
-  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[4], A.m, psm.jnt_pos[0]);
+  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[4], A, psm.jnt_pos[0]);
   wrist_pitch = ci::Matrix44d(A);
 
   //don't actually care about wrist yaw as the clasper pose 'contains' this information
@@ -220,11 +220,23 @@ void buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciChain, const AP
   grip2 = ci::Matrix44d(A);
 
   //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
-  double val = psm.jnt_pos[3];
-  grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  double val = psm.jnt_pos[2];
 
-  grip2.rotate(ci::Vec3d(0, 0, 1), M_PI);
-  grip2.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  ci::Matrix44d test; test.setToIdentity();
+  test = test.createRotation(ci::Vec3f(0, 1, 0), val);
+  ci::Matrix44d grip1d = grip1;
+  ci::Matrix44d grip2d = grip2;
+
+  //grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  glhMultMatrixRight(test.m, grip1d.m);
+
+  test.setToIdentity();
+  test = test.createRotation(ci::Vec3f(0, 1, 0), -val);
+  glhMultMatrixRight(test.m, grip2d.m);
+
+
+  grip1 = grip1d;
+  grip2 = grip2d;
 
 }
 
@@ -261,7 +273,7 @@ void buildKinematicChainAtEndPSM2(DaVinciKinematicChain &mDaVinciChain, const AP
 
   ci::Matrix44d A = roll;
 
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[4], A.m, psm.jnt_pos[0]);
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[4], A, psm.jnt_pos[0]);
   wrist_pitch = ci::Matrix44d(A);
 
   //don't actually care about wrist yaw as the clasper pose 'contains' this information
@@ -276,11 +288,23 @@ void buildKinematicChainAtEndPSM2(DaVinciKinematicChain &mDaVinciChain, const AP
   grip2 = ci::Matrix44d(A);
 
   //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
-  double val = psm.jnt_pos[3];
-  grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  double val = psm.jnt_pos[2];
 
-  grip2.rotate(ci::Vec3d(0, 0, 1), M_PI);
-  grip2.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  ci::Matrix44d test; test.setToIdentity();
+  test = test.createRotation(ci::Vec3f(0, 1, 0), val);
+  ci::Matrix44d grip1d = grip1;
+  ci::Matrix44d grip2d = grip2;
+
+  //grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
+  glhMultMatrixRight(test.m, grip1d.m);
+
+  test.setToIdentity();
+  test = test.createRotation(ci::Vec3f(0, 1, 0), -val);
+  glhMultMatrixRight(test.m, grip2d.m);
+
+
+  grip1 = grip1d;
+  grip2 = grip2d;
 
 }
 

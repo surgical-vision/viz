@@ -30,6 +30,7 @@ namespace viz {
     virtual void mouseDrag(MouseEvent event) override;
     virtual void shutdown() override;
     virtual void fileDrop(FileDropEvent event) override;
+    virtual void mouseMove(MouseEvent event) override;
 
   protected:
 
@@ -74,9 +75,11 @@ namespace viz {
 
     /**
     * Draw the 3D scene with the camera and trackable targets from a observer viewpoint.
-    * @param[in] image The current camera frame, is draw onto the camera model in the 3D viewer.
+    * @param[in] left_image The current left camera frame, is draw onto the camera model in the 3D viewer.
+    * @param[in] right_image The current right camera frame, is draw onto the camera model in the 3D viewer.
+
     */
-    void draw3D(gl::Texture &image);
+    void draw3D(gl::Texture &left_image, gl::Texture &right_image);
 
     /**
     * Draw the camera view onto the viewport.
@@ -86,9 +89,10 @@ namespace viz {
 
     /** 
     * Draw a 3D model of a camera with it's view mapped onto it's image plane.
-    * @param[in] image The image viewed by the camera.
+    * @param[in] left_image The left image viewed by the camera.
+    * @param[in] right_image The right image viewed by the camera.
     */
-    void drawCamera(gl::Texture &image);
+    void drawCamera(gl::Texture &left_image, gl::Texture &right_image);
 
     /**
     * Actually map the image onto the camera image plane.
@@ -115,8 +119,9 @@ namespace viz {
     /**
     * Load one of the trackables.
     * @param[in] reader The ConfigReader which has the location of the config file for this trackable.
+    * @param[in] output_dir_this_run Create a new output directory for the trackables.
     */
-    void loadTrackables(const ConfigReader &reader);
+    void loadTrackables(const ConfigReader &reader, const std::string &output_dir_this_run);
 
     /**
     * Wrapper to get the current camera pose. If we have loaded a moveable camera then return its pose, if not then return the identity transform.
@@ -145,7 +150,8 @@ namespace viz {
 
     VideoIO video_left_; /**< The left video IO device. Reads input frames and saves the frames with the corresponding output save on top. */
     VideoIO video_right_;  /**< The right video IO device. Reads input frames and saves the frames with the corresponding output save on top. */
-    
+    VideoIO stereo_video_;
+
     StereoCamera camera_; /**< The physical camera device which models the actual camera which views the scene. Handles projection the models into the image plane of the camera with physically realistic results. */
 
     gl::Texture left_texture_; /**< The current left camera view */
@@ -153,8 +159,10 @@ namespace viz {
     gl::Fbo framebuffer_; /**< The framebuffer to hold the drawing for the 'eye' views. */
     gl::Fbo framebuffer_3d_; /**< The framebuffer to the hold the drawing for the 3D view. */
 
+    MayaCamUI maya_cam_2_;
     MayaCamUI maya_cam_; /**< The framebuffer to the hold the drawing for the 3D view. */
-    
+    ci::Vec2i	mouse_pos_; /**< Current estimate of mouse position. */
+
     std::vector< boost::shared_ptr<BasePoseGrabber> > trackables_; /**< The set of trackable objects to draw on the views. */
     boost::shared_ptr<BasePoseGrabber> moveable_camera_; /**< A possibly movable camera too. If this isn't set then the identity camera transform is used (leaving the camera always at the origin). */
     boost::shared_ptr<BasePoseGrabber> tracked_camera_; /**< If we are tracking the possibly moveable camera then we can visualize how the tracking performance was with this object. */
@@ -172,6 +180,14 @@ namespace viz {
     bool update_toggle_; /**< Toggle to set whether the updates load from the file or just refresh. Useful for instance if manual offsets are being applied to pose of trackables in the UI and you want to draw these new poses. */
 
     bool synthetic_save_;
+
+    bool loaded_;
+
+    bool done_; /**< Flag to indicated finished status. */
+
+    bool save_viewport_data_;
+
+    cv::VideoWriter writer_;
 
   };
 

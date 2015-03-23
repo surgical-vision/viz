@@ -53,7 +53,7 @@ PoseGrabber::PoseGrabber(const ConfigReader &reader, const std::string &output_d
 
 }
 
-void PoseGrabber::LoadPose(const bool no_reload){
+bool PoseGrabber::LoadPose(const bool no_reload){
 
   do_draw_ = false; //set to true only if we read a 'good' pose
 
@@ -84,12 +84,15 @@ void PoseGrabber::LoadPose(const bool no_reload){
     catch (std::ofstream::failure e){
       cached_model_pose_.setToIdentity();
       do_draw_ = false;
+      return false;
     }
   }
 
   // update the model with the pose
   std::vector<ci::Matrix44f> ret({ cached_model_pose_ });
   model_.SetTransformSet(ret);
+
+  return true;
 
 }
 
@@ -178,7 +181,7 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader, const std
   base_joints_ = std::vector<double>(num_base_joints_, 0.0);
 
   try{
-    SetupOffsets(reader.get_element("base-offsets"), reader.get_element("arm-offsets"));
+    SetupOffsets(reader.get_element("base-offset"), reader.get_element("arm-offset"));
   }
   catch (std::runtime_error &){
     
@@ -275,11 +278,11 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
   }
 }
 
-void DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
+bool DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
 
   if (!no_reload){
     if (!ReadDHFromFiles(base_joints_, arm_joints_))
-      return;
+      return false;
   }
 
   //don't care about the return.
@@ -289,6 +292,8 @@ void DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
   if (!no_reload){
     reference_frame_tracks_.push_back(model_.Shaft().transform_);
   }
+
+  return true;
 
 }
 
@@ -398,7 +403,7 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
 
 }
 
-void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
+bool SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
   
   do_draw_ = false; //set to true only if we read a 'good' pose
 
@@ -409,7 +414,33 @@ void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
     try{
       std::string line;
       int row = 0;
-      while (1)
+      //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
+      ci::Vec3f translation;
+      ci::Vec4f rotation;
+      ci::Vec4f articulation;
+      for (int i = 0; i < 3; ++i){
+        ifs_ >> translation[i];
+      }
+      for (int i = 0; i < 4; ++i){
+        ifs_ >> rotation[i];
+      }
+      for (int i = 0; i < 4; ++i){
+        ifs_ >> articulation[i];
+      }
+      for (int i = 0; i < 3; ++i){
+        wrist_dh_params_[i] = articulation[i];
+      }
+      ci::Quatf q(rotation[0], rotation[1], rotation[2], rotation[3]);
+      ci::Matrix44f rot = q;
+      for (int r = 0; r < 3; ++r){
+        for (int c = 0; c < 3; ++c){
+          shaft_pose_.at(r, c) = rot.at(r, c);
+        }
+      }
+
+      shaft_pose_.setTranslate(translation);
+      do_draw_ = true;
+      /*while (1)
       {
         std::getline(ifs_, line);
         if (row == 4) break;
@@ -428,7 +459,7 @@ void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
         double x;
         ifs_ >> x;
         wrist_dh_params_[i] = x;
-      }
+      }*/
 
       // update the list of previous poses for plotting trajectories.
       reference_frame_tracks_.push_back(shaft_pose_);
@@ -437,10 +468,11 @@ void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
     catch (std::ofstream::failure e){
       shaft_pose_.setToIdentity();
       do_draw_ = false;
+      return false;
     }
 
   }
-  if (do_draw_ == false) return;
+  if (do_draw_ == false) return false;
 
   model_.Shaft().transform_ = shaft_pose_;
 
@@ -453,6 +485,8 @@ void SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
     buildKinematicChainAtEndPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
   else if (target_joint_ == davinci::PSM2)
     buildKinematicChainAtEndPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+
+  return true;
 
 }
 
