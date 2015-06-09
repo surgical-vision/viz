@@ -13,6 +13,19 @@ inline void clean_string(std::string &str, const std::vector<char> &to_remove){
   }
 }
 
+size_t BasePoseGrabber::grabber_num_id_ = 0;
+
+BasePoseGrabber::BasePoseGrabber() : do_draw_(false) {
+
+  std::stringstream ss;
+  ss << "Pose grabber " << grabber_num_id_;
+  param_modifier_ = ci::params::InterfaceGl::create(ci::app::getWindow(), ss.str(), ci::app::toPixels(ci::Vec2i(50, 50)));
+  param_modifier_->hide();  
+
+  grabber_num_id_++;
+
+}
+
 void BasePoseGrabber::convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
 
   out_pose.setToIdentity();
@@ -218,15 +231,26 @@ void DHDaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const s
 
   std::stringstream ss;
   
+  param_modifier_->addText("", "label=`Edit the set up joints`");
+
   ss << base_offsets;
   for (size_t i = 0; i < base_offsets_.size(); ++i){
     ss >> base_offsets_[i];
+    std::stringstream ss;
+    ss << "SU Joint " << i;
+    param_modifier_->addParam(ss.str(), &(base_offsets_[i]), "min=0 max=1 step= 0.0001 keyIncr=z keyDecr=Z");
   }
+
+  param_modifier_->addSeparator();
+  param_modifier_->addText("", "label=`Edit the arm joints`");
 
   ss.clear();
   ss << arm_offsets;
   for (size_t i = 0; i < arm_offsets_.size(); ++i){
     ss >> arm_offsets_[i];
+    std::stringstream ss;
+    ss << "Joint " << i;
+    param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=0 max=1 step= 0.0001 keyIncr=z keyDecr=Z");
   }
 
 }

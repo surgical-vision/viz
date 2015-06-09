@@ -5,16 +5,17 @@
 
 using namespace viz;
 
+VideoIO::VideoIO(const std::string &inpath){
 
-VideoIO::VideoIO(const std::string &inpath, const std::string &outpath){
-
-  if (boost::filesystem::path(inpath).extension().string() == ".png" ||
+   if (boost::filesystem::path(inpath).extension().string() == ".png" ||
     boost::filesystem::path(inpath).extension().string() == ".jpg" ||
     boost::filesystem::path(inpath).extension().string() == ".jpeg" ||
     boost::filesystem::path(inpath).extension().string() == ".bmp"){
     image_input_ = cv::imread(inpath);
+    
     image_width_ = image_input_.cols;
     image_height_ = image_input_.rows;
+
   }
   else{
     cap_.open(inpath);
@@ -22,14 +23,29 @@ VideoIO::VideoIO(const std::string &inpath, const std::string &outpath){
     image_width_ = cap_.get(CV_CAP_PROP_FRAME_WIDTH);
     image_height_ = cap_.get(CV_CAP_PROP_FRAME_HEIGHT);
   }
-  
-/*  for (int i = 0; i < 59; ++i){
-    cv::Mat f;
-    cap_ >> f;
-  }*/
 
-  //image_width_ = image_width__;
-  //image_height_ = image_height_ / 2;
+}
+
+
+VideoIO::VideoIO(const std::string &inpath, const std::string &outpath) : VideoIO(inpath) {
+
+  if (boost::filesystem::path(inpath).extension().string() == ".png" ||
+    boost::filesystem::path(inpath).extension().string() == ".jpg" ||
+    boost::filesystem::path(inpath).extension().string() == ".jpeg" ||
+    boost::filesystem::path(inpath).extension().string() == ".bmp"){
+    image_input_ = cv::imread(inpath);
+
+    image_width_ = image_input_.cols;
+    image_height_ = image_input_.rows;
+
+
+  }
+  else{
+    cap_.open(inpath);
+    if (!cap_.isOpened()) throw std::runtime_error("Error, could not open input video file");
+    image_width_ = cap_.get(CV_CAP_PROP_FRAME_WIDTH);
+    image_height_ = cap_.get(CV_CAP_PROP_FRAME_HEIGHT);
+  } 
 
   writer_.open(outpath, CV_FOURCC('D','I','B',' '), 25, cv::Size(image_width_, image_height_));
 
@@ -62,7 +78,15 @@ cv::Mat VideoIO::Read(){
   if (!can_read_) return cv::Mat::zeros(cv::Size(0, 0), CV_8UC3);
 
   cv::Mat f;
-  cap_ >> f;
+
+
+  if (cap_.isOpened()){
+    cap_ >> f;
+  }
+  else if (!image_input_.empty()){
+    f = image_input_.clone();
+  }
+  
 
   if (f.data == 0x0){
     f = cv::Mat::zeros(cv::Size(image_width_, image_height_), CV_8UC3);

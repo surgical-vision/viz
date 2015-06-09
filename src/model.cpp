@@ -43,7 +43,7 @@ void BaseModel::InternalDraw(const RenderData &rd) const {
   ci::Matrix44f f = rd.transform_;
   ci::Matrix44f reflection;
   reflection.setToIdentity();
-  /*reflection.at(0, 0) *= -1;*/
+  /*reflection.at(0, 0) *= -1;*/ // only works if loading from SE3 not DH chain
 
   ci::gl::multModelView(reflection*f);
 

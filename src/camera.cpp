@@ -39,7 +39,7 @@ void Camera::makeCurrentCamera() const {
 
 }
 
-void StereoCamera::Setup(const std::string &calibration_filename, const int image_width, const int image_height, const int near_clip_distance, const int far_clip_distance){
+void StereoCamera::Setup(const std::string &calibration_filename, const int near_clip_distance, const int far_clip_distance){
 
   if(!boost::filesystem::exists(boost::filesystem::path(calibration_filename)))
     throw(std::runtime_error("Error, could not find camera calibration file: " + calibration_filename + "\n"));
@@ -60,6 +60,11 @@ void StereoCamera::Setup(const std::string &calibration_filename, const int imag
     cv::Mat rotation(3, 3, CV_64FC1), translation(3, 1, CV_64FC1);
     fs["Extrinsic_Camera_Rotation"] >> rotation;
     fs["Extrinsic_Camera_Translation"] >> translation;
+
+    cv::Mat image_size;
+    fs["Image_Dimensions"] >> image_size;
+    size_t image_width = image_size.at<int>(0);
+    size_t image_height = image_size.at<int>(1);
 
     convertBouguetToGLCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
     //convertBouguetToDaVinciCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
@@ -93,23 +98,6 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
   extrinsic_rotation = extrinsic_rotation.inv();
   extrinsic_translation = extrinsic_translation * -1;
 
-  /*
-
-  //set the rotation matrix
-  cv::Mat inv_rotation = extrinsic_rotation.inv();
-  cv::Mat flip = cv::Mat::eye(3, 3, CV_64FC1);// [1, 0, 0; 0, -1, 0; 0, 0, -1];
-  //flip.at<double>(1, 1) = -1; flip.at<double>(2, 2) = -1;
-  flip.at<double>(1, 1) = -1; flip.at<double>(0, 0) = -1;
-  cv::Mat in_gl_coords = flip * inv_rotation * flip;
-  extrinsic_rotation = in_gl_coords.clone();
-
-  */
-
-  //set the translation matrix by flipping x ( basically flip everything (we use inv transforms) then flip y and z so just flip x to get same result)
- 
-  //extrinsic_translation.at<double>(0, 0) *= -1;
-  
-  
 }
 
 void StereoCamera::convertBouguetToDaVinciCoordinates(cv::Mat &left_camera_matrix, cv::Mat &right_camera_matrix, cv::Mat &extrinsic_rotation, cv::Mat &extrinsic_translation, const int image_width, const int image_height){

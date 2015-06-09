@@ -8,6 +8,7 @@ namespace viz {
   public:
 
     VideoIO() : can_read_(false), is_open_(false) {}
+    VideoIO(const std::string &inpath);
     VideoIO(const std::string &inpath, const std::string &outpath);
     virtual ~VideoIO();
 

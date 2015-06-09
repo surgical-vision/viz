@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cinder/app/App.h>
 #include <cinder/Matrix.h>
+#include <cinder/params/Params.h>
 #include <fstream>
 #include <vector>
 #include <boost/shared_ptr.hpp>
@@ -10,7 +12,6 @@
 #include "../include/model.hpp"
 
 namespace viz {
-
 
   /**
   * @class BasePoseGrabber
@@ -25,7 +26,7 @@ namespace viz {
     /**
     * Default constructor. Sets the do_draw_ flag to false so that nothing gets drawn until we've successfully read a pose value from a pose file.
     */
-    BasePoseGrabber() : do_draw_(false) {}
+    BasePoseGrabber();
     
     /**
     * Load the next pose value from the file. This changes the class' internal representation of its pose when it renders the model.
@@ -70,6 +71,8 @@ namespace viz {
     */
     const std::vector<ci::Matrix44f> &History() const { return reference_frame_tracks_; }
 
+    ci::params::InterfaceGlRef ParamModifier() { return param_modifier_; }
+
   protected:
     
     void checkSelfName(const std::string &test_name) const { if (test_name != self_name_) throw std::runtime_error(""); }
@@ -85,6 +88,10 @@ namespace viz {
     std::vector<ci::Matrix44f> reference_frame_tracks_; /**< Keeps track of previous SE3s to represent the model for plotting trajectories across 3D space. For articulated bodies this should be the 'global' pose of the object. */
 
     std::string self_name_;
+
+    ci::params::InterfaceGlRef param_modifier_;
+
+    static size_t grabber_num_id_;
 
   };
 

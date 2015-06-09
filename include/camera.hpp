@@ -51,7 +51,7 @@ namespace viz {
 
     StereoCamera() : left_eye_(0), right_eye_(1) {}
 
-    void Setup(const std::string &calibration_file, const int image_width, const int image_height, const int near_clip_distance, const int far_clip_distance); 
+    void Setup(const std::string &calibration_file, const int near_clip_distance, const int far_clip_distance); 
 
     void setupLeftCamera(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);
     void setupRightCamera(ci::MayaCamUI &cam, const ci::Matrix44f &current_camera_pose);

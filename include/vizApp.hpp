@@ -6,17 +6,29 @@
 #include <cinder/gl/Texture.h>
 #include <cinder/gl/GlslProg.h>
 #include <cinder/MayaCamUI.h>
+#include <cinder/params/Params.h>
 #include <boost/tuple/tuple.hpp>
 
 #include "camera.hpp"
 #include "pose_grabber.hpp"
 #include "video.hpp"
-
+#include "sub_window.hpp"
 
 using namespace ci;
 using namespace ci::app;
 
 namespace viz {
+
+ 
+  struct State {
+
+    bool save_all;
+    bool save_one;
+
+    bool load_all;
+    bool load_one;
+
+  };
 
   class vizApp : public AppNative {
 
@@ -32,7 +44,31 @@ namespace viz {
     virtual void fileDrop(FileDropEvent event) override;
     virtual void mouseMove(MouseEvent event) override;
 
+    void runVideoButton();
+    void editPoseButton(const size_t item_idx);
+
+    static void AddSubWindow(SubWindow *sbw) { sub_windows_.push_back(sbw); }
+
   protected:
+
+    SubWindow left_eye;
+    SubWindow right_eye;
+    SubWindow gui_port;
+    SubWindow editor_port;
+    SubWindow scene_viewer;
+    SubWindow trajectory_viewer;
+
+    State state;
+    
+    bool running_;
+
+    void draw3DViewports();
+    void drawCameraEyes();
+    void drawLeftEye();
+    void drawRightEye();
+    void setupGUI();
+    void updateModels();
+    void updateVideo();
 
     /**
     * Create a visualization environment from a configuration file. To see an example configuration file, see config/app.cfg.
@@ -42,10 +78,11 @@ namespace viz {
     
     /**
     * Save a frame and the current tracked object poses (useful if they have been modified within the GUI).
-    * @param[in] texture The frame to save.
     * @param[in] is_left Flag to set whether this the the left or right channel.
     */
-    void saveFrame(gl::Texture texture, bool is_left);
+    void saveState(bool is_left);
+    void savePoses(bool is_left);
+    void saveFrames(gl::Texture texture, bool is_left);
 
     /**
     * Draw a grid on the ground plane. 
@@ -77,9 +114,8 @@ namespace viz {
     * Draw the 3D scene with the camera and trackable targets from a observer viewpoint.
     * @param[in] left_image The current left camera frame, is draw onto the camera model in the 3D viewer.
     * @param[in] right_image The current right camera frame, is draw onto the camera model in the 3D viewer.
-
     */
-    void draw3D(gl::Texture &left_image, gl::Texture &right_image);
+    void drawScene(gl::Texture &left_image, gl::Texture &right_image);
 
     /**
     * Draw the camera view onto the viewport.
@@ -174,20 +210,11 @@ namespace viz {
     size_t three_dim_viz_width_; /**< The width of the 3D visualizer window. */
     size_t three_dim_viz_height_; /**< The width of the 3D visualizer window. */
 
-    bool run_video_; /**< Toggle to set whether the video just runs and loads new poses without prompting. */
-    bool load_next_image_; /**< Toggle to manually load the next frame and poses. */
-    bool save_toggle_; /**< Toggle to set saving of all data from the visualizer (poses and video frames). */
-    bool update_toggle_; /**< Toggle to set whether the updates load from the file or just refresh. Useful for instance if manual offsets are being applied to pose of trackables in the UI and you want to draw these new poses. */
-
-    bool synthetic_save_;
-
-    bool loaded_;
-
-    bool done_; /**< Flag to indicated finished status. */
-
-    bool save_viewport_data_;
-
     cv::VideoWriter writer_;
+
+    ci::params::InterfaceGlRef	gui_;
+
+    static std::vector<SubWindow *> sub_windows_;
 
   };
 

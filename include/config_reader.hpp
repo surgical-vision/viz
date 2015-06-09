@@ -37,9 +37,13 @@ namespace viz {
       }
     }
 
+    bool has_element(const std::string &key) const {
+      return config_.count(key) > 0;
+    }
+
     std::string get_element(const std::string &key) const {
 
-      if (config_.count(key) == 0){
+      if (!has_element(key)){
         throw std::runtime_error("Couldn't find key!");
       }
       else{
