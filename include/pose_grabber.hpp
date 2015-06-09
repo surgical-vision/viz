@@ -8,8 +8,8 @@
 #include <boost/shared_ptr.hpp>
 
 #include "davinci.hpp"
-#include "../include/config_reader.hpp"
-#include "../include/model.hpp"
+#include "config_reader.hpp"
+#include "model.hpp"
 
 namespace viz {
 

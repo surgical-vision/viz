@@ -2,7 +2,10 @@
 #include <cinder/app/App.h>
 
 /*
-Modified from original by Philip Pratt, Imperial College London
+  
+  This set of Da Vinci DH functions is modified from code provided 
+  by Philip Pratt, Imperial College London
+
 */
 
 // OpenGL matrix offsets

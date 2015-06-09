@@ -16,13 +16,13 @@ set(
   HEADERS
   ${INCDIR}/camera.hpp ${INCDIR}/config_reader.hpp
   ${INCDIR}/pose_grabber.hpp ${INCDIR}/davinci.hpp
-  ${INCDIR}/resources.hpp ${INCDIR}/snippets.hpp 
+  ${INCDIR}/resources.hpp
   ${INCDIR}/vizApp.hpp  ${INCDIR}/video.hpp
   ${INCDIR}/model.hpp ${INCDIR}/sub_window.hpp
 )
 
 ## Store list of source files
-set( SOURCES camera.cpp davinci.cpp pose_grabber.cpp video.cpp snippets.cpp vizApp.cpp model.cpp sub_window.cpp )
+set( SOURCES camera.cpp davinci.cpp pose_grabber.cpp video.cpp vizApp.cpp model.cpp sub_window.cpp )
 
 
 #######################################################

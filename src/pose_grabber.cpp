@@ -1,8 +1,7 @@
 #include <cinder/Quaternion.h>
 #include <cinder/app/App.h>
 
-#include "api_stream.h"
-#include "snippets.hpp"
+#include "davinci.hpp"
 #include "../include/pose_grabber.hpp"
 
 using namespace viz;
@@ -184,7 +183,7 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader, const std
     break;
   case davinci::DaVinciJoint::ECM:
     num_base_joints_ = chain_.mSUJ3OriginSUJ3Tip.size();
-    num_arm_joints_ = 4;//chain_.mECM1OriginECM1Tip.size(); //alhtough this value is 4 in the file in p. pratt's code it is 7
+    num_arm_joints_ = 4;//chain_.mECM1OriginECM1Tip.size(); 
     break;
   }
 
@@ -222,8 +221,6 @@ DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader, const std
   catch (...){
     se3_ofs_file_ = output_dir + "/" + reader.get_element("output-se3"); //stupid old code 
   }
-
-  //getting weird errors here. check that output-se3-file is defined
   
 }
 
@@ -259,7 +256,7 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
 
   if (target_joint_ == davinci::ECM){
 
-    API_ECM ecm;
+    viz::davinci::ECMData ecm;
 
     for (std::size_t i = 0; i < base_joints_.size(); ++i){
       ecm.sj_joint_angles[i] = base_joints_[i] + base_offsets_[i];
@@ -277,7 +274,7 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
 
   else if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
 
-    API_PSM psm;
+    viz::davinci::PSMData psm;
 
     for (std::size_t i = 0; i < base_joints_.size(); ++i){
       psm.sj_joint_angles[i] = base_joints_[i] + base_offsets_[i];
@@ -500,7 +497,7 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
 
   model_.Shaft().transform_ = shaft_pose_;
 
-  API_PSM psm;
+  viz::davinci::PSMData psm;
   for (size_t i = 0; i < num_wrist_joints_; ++i){
     psm.jnt_pos[i] = wrist_dh_params_[i];
   }
