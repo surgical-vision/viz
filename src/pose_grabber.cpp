@@ -321,7 +321,7 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
 
 bool DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
 
-  if (!no_reload){
+  if (no_reload){
     if (!ReadDHFromFiles(base_joints_, arm_joints_))
       return false;
   }
@@ -330,7 +330,7 @@ bool DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
   GetPose();
 
   // update the list of previous poses for plotting trajectories.
-  if (!no_reload){
+  if (no_reload){
     reference_frame_tracks_.push_back(model_.Shaft().transform_);
   }
 
@@ -450,7 +450,7 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
 
   assert(num_wrist_joints_ == wrist_dh_params_.size());
 
-  if (!no_reload){
+  if (no_reload){
 
     try{
       std::string line;

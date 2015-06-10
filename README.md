@@ -22,3 +22,20 @@ Install guide
 -------------
 
 Cmake it.
+
+Usage
+-----
+
+The examples directory contains an example model configuration file (in .json format) and an application configuration file.
+Run the application as `> viz /path/to/config.cfg` or drag and drop the file into the window. You can run the video frames loading the 
+pose data from the objects using the run button and also save the contents of each window using the appropriate button.
+The example model configuration file contains the configuration for a da Vinci instrument. Unfortunately we cannot provide the CAD model
+for this example but it gives a demonstration of how the components are specified and how each components DH parameters are specified.
+
+Acknowledgements
+----------------
+
+If you use this software in this work, please acknowledge the authors
+
+* [Max Allan](mailto:m.allan@cs.ucl.ac.uk), University College London
+* [Philip Pratt](mailto:p.pratt@imperial.ac.uk), Imperial College London
