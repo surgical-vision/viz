@@ -114,6 +114,8 @@ void SubWindow::Draw(){
   
   ci::Rectf window_with_buffer = GetRectWithBuffer();
 
+  cv::Mat m = toOcv(framebuffer_->getTexture());
+
   ci::gl::draw(framebuffer_->getTexture(), window_with_buffer);
 
   if (can_save_){

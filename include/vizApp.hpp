@@ -70,6 +70,7 @@ namespace viz {
 
     void runVideoButton();
     void editPoseButton(const size_t item_idx);
+    void resetViewerButton();
 
     static void AddSubWindow(SubWindow *sbw) { sub_windows_.push_back(sbw); }
 
@@ -234,11 +235,11 @@ namespace viz {
     size_t three_dim_viz_width_; /**< The width of the 3D visualizer window. */
     size_t three_dim_viz_height_; /**< The width of the 3D visualizer window. */
 
-    cv::VideoWriter writer_;
+    ci::params::InterfaceGlRef	gui_; /**< The GUI. */
 
-    ci::params::InterfaceGlRef	gui_;
+    static std::vector<SubWindow *> sub_windows_; /**< A set of pointers to the various SubWindows in the display. Allows easy iteration over these windows for saving etc. */
 
-    static std::vector<SubWindow *> sub_windows_;
+    bool reset_viz_port_; /**< Flag to reset the vizport if we move the MayaCam too far away. */
 
   };
 

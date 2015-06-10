@@ -169,6 +169,8 @@ void vizApp::setupGUI(){
   gui_ = params::InterfaceGl::create(getWindow(), "App parameters", toPixels(Vec2i(100, 100)));
 
   gui_->addButton("Run Video", std::bind(&vizApp::runVideoButton, this));
+  gui_->addButton("Reset 3D Viewer", std::bind(&vizApp::resetViewerButton, this));
+
 
   gui_->addSeparator();
 
@@ -182,6 +184,12 @@ void vizApp::setupGUI(){
     gui_->addButton(ss.str(), std::bind(&vizApp::editPoseButton, this, i+1));
   }
 
+
+}
+
+void vizApp::resetViewerButton() {
+
+  reset_viz_port_ = true;
 
 }
 
@@ -230,6 +238,8 @@ void vizApp::setup(){
   
   state.save_one = false;
   state.save_all = false;
+
+  reset_viz_port_ = true;
 
   shader_ = gl::GlslProg(loadResource(RES_SHADER_VERT), loadResource(RES_SHADER_FRAG));
 
@@ -314,9 +324,18 @@ void vizApp::updateVideo(){
     else{
 
       cv::Mat resized_left, resized_right;
+      
+      if (left_frame.size() == cv::Size(0, 0)){
+        left_frame = cv::Mat::zeros(cv::Size(camera_.GetLeftCamera().getImageWidth(), camera_.GetLeftCamera().getImageHeight()), CV_8UC3);
+      }
+
+      if (right_frame.size() == cv::Size(0, 0)){
+        right_frame = cv::Mat::zeros(cv::Size(camera_.GetLeftCamera().getImageWidth(), camera_.GetLeftCamera().getImageHeight()), CV_8UC3);
+      }
+
       cv::resize(left_frame, resized_left, cv::Size(camera_.GetLeftCamera().getImageWidth(), camera_.GetLeftCamera().getImageHeight()));
       cv::resize(right_frame, resized_right, cv::Size(camera_.GetRightCamera().getImageWidth(), camera_.GetRightCamera().getImageHeight()));
-
+      ci::app::console() << "done 317" << std::endl;
       left_texture_ = fromOcv(resized_left);
       right_texture_ = fromOcv(resized_right);
       state.load_one = false;
@@ -371,7 +390,6 @@ void vizApp::draw2D(gl::Texture &tex){
   glViewport(vp[0], vp[1], vp[2], vp[3]);
 }
 
-
 void vizApp::drawLeftEye() {
 
   drawEye(left_texture_, true);
@@ -379,7 +397,6 @@ void vizApp::drawLeftEye() {
   saveState(true);
   
 }
-
 
 void vizApp::drawRightEye(){
 
@@ -419,10 +436,12 @@ void vizApp::draw(){
 
   /** draw scene **/
   scene_viewer.BindAndClear();
+  drawScene(left_texture_, right_texture_);
   scene_viewer.UnBind();
   scene_viewer.Draw();
 
   trajectory_viewer.BindAndClear();
+  drawCameraTracker();
   trajectory_viewer.UnBind();
   trajectory_viewer.Draw();
 
@@ -591,20 +610,20 @@ void vizApp::drawCameraTracker(){
 void vizApp::drawScene(gl::Texture &left_image, gl::Texture &right_image){
   
   gl::clear(Color(0.15, 0.15, 0.15));
-  //gl::clear(Color(1.0, 1.0, 1.0));
 
   if (trackables_.size() == 0) return;
-    
-  ci::Vec3f eye_point = trackables_[0]->GetPose().getTranslate().xyz() + ci::Vec3f(77.7396, -69.9107, -150.47f);
+  
+  if (reset_viz_port_){
 
-  static bool first = true;
-  if (first){
+    ci::Vec3f eye_point = trackables_[0]->GetPose().getTranslate().xyz() + ci::Vec3f(77.7396, -69.9107, -150.47f);
+
     ci::CameraPersp maya;
     maya.setEyePoint(eye_point);
     maya.setOrientation(ci::Quatf(ci::Vec3f(0.977709, -0.0406959, 0.205982), 2.75995));
     maya_cam_2_.setCurrentCam(maya);
+    reset_viz_port_ = false;
+  
   }
-  first = false;
 
   gl::pushMatrices();
   gl::setMatrices(maya_cam_2_.getCamera());
@@ -893,28 +912,6 @@ void vizApp::fileDrop(FileDropEvent event){
 
 }
 
-void vizApp::movePose(KeyEvent event){
-  
-  static int current_model_idx = 0;
-
-  //set the index of the model we want to track
-  if (std::isdigit(event.getChar(), std::locale())){
-    std::stringstream ss;
-    ss << event.getChar();
-    ss >> current_model_idx;
-    return;
-   }
-
-
-  if (current_model_idx == 0){
-    applyOffsetToCamera(event);
-  }
-  else{
-    applyOffsetToTrackedObject(event, current_model_idx);
-  }
-     
-}
-
 void vizApp::mouseMove(MouseEvent m_event){
   // keep track of the mouse
   mouse_pos_ = m_event.getPos();
@@ -922,10 +919,10 @@ void vizApp::mouseMove(MouseEvent m_event){
 
 void vizApp::keyDown(KeyEvent event){
 
-  //if (event.getChar() == ' '){
-  //  load_next_image_ = true;
-  //  return;
-  //}
+  if (event.getChar() == ' '){
+    state.load_one = true;
+    return;
+  }
 
   //else if (event.getChar() == 's'){
   //  save_toggle_ = !save_toggle_;
@@ -953,237 +950,5 @@ void vizApp::keyDown(KeyEvent event){
   //  save_viewport_data_ = true;
   //}
 
-  movePose(event);
 
 }
-
-void vizApp::applyOffsetToCamera(KeyEvent &event){
-
-  double suj_offset = 0.004;
-  double j_offset = 0.001;
-  
-  if (moveable_camera_ == nullptr) return;
-
-  boost::shared_ptr<DHDaVinciPoseGrabber> grabber;
-  try{
-
-    grabber = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(moveable_camera_);
-
-  }
-  catch (boost::bad_lexical_cast &){
-
-    return;
-
-  }
-
-  std::vector<double> &arm_offset = grabber->getArmOffsets();
-  std::vector<double> &base_offset = grabber->getBaseOffsets();
-
-  //the base offsets
-  if (event.getChar() == 'q'){
-    base_offset[0] += suj_offset;
-  }
-  else if (event.getChar() == 'w'){
-    base_offset[1] += suj_offset;
-  }
-  else if (event.getChar() == 'e'){
-    base_offset[2] += suj_offset;
-  }
-  else if (event.getChar() == 'r'){
-    base_offset[3] += suj_offset;
-  }
-  else if (event.getChar() == 't'){
-    base_offset[4] += suj_offset;
-  }
-  else if (event.getChar() == 'y'){
-    base_offset[5] += suj_offset;
-  }
-  else if (event.getChar() == 'Q'){
-    base_offset[0] -= suj_offset;
-  }
-  else if (event.getChar() == 'W'){
-    base_offset[1] -= suj_offset;
-  }
-  else if (event.getChar() == 'E'){
-    base_offset[2] -= suj_offset;
-  }
-  else if (event.getChar() == 'R'){
-    base_offset[3] -= suj_offset;
-  }
-  else if (event.getChar() == 'T'){
-    base_offset[4] -= suj_offset;
-  }
-  else if (event.getChar() == 'Y'){
-    base_offset[5] -= suj_offset;
-  }
-
-
-  //the arm offset
-  else if (event.getChar() == 'z'){
-    arm_offset[0] += suj_offset;
-  }
-  else if (event.getChar() == 'x'){
-    arm_offset[1] += suj_offset;
-  }
-  else if (event.getChar() == 'c'){
-    arm_offset[2] += suj_offset;
-  }
-  else if (event.getChar() == 'v'){
-    arm_offset[3] += suj_offset;
-  }
-  else if (event.getChar() == 'Z'){
-    arm_offset[0] -= suj_offset;
-  }
-  else if (event.getChar() == 'X'){
-    arm_offset[1] -= suj_offset;
-  }
-  else if (event.getChar() == 'C'){
-    arm_offset[2] -= suj_offset;
-  }
-  else if (event.getChar() == 'V'){
-    arm_offset[3] -= suj_offset;
-  }
-
-  console() << "Camera base offset is:\n[";
-  for (size_t i = 0; i < base_offset.size(); ++i){
-    console() << base_offset[i];
-    if (i != base_offset.size() - 1)  console() << ", ";
-  }
-  console() << "]\n";
-  console() << "Camera arm offset is:\n[";
-  for (size_t i = 0; i < arm_offset.size(); ++i){
-    console() << arm_offset[i];
-    if (i != arm_offset.size() - 1)  console() << ", ";
-  }
-  console() << "]" << std::endl;
-
-}
-
-void vizApp::applyOffsetToTrackedObject(KeyEvent &event, const int current_model_idx){
-
-  //top row is SUJ
-  //bottom row is J
-
-  int model_idx = current_model_idx - 1; //as the camera is idx zero
-
-  if ((size_t)model_idx >= trackables_.size()) return;
-
-  boost::shared_ptr<DHDaVinciPoseGrabber> grabber;
-  try{
-  
-     grabber = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[model_idx]);
-  
-  }
-  catch (boost::bad_lexical_cast &){
-    
-    return;
-  
-  }
-
-  if (grabber == nullptr) return;
-
-  std::vector<double> &arm_offset = grabber->getArmOffsets();
-  std::vector<double> &base_offset = grabber->getBaseOffsets();
-
-  double suj_offset = 0.0004;
-  double j_offset = 0.0001;
-
-  const int SCALE_FACTOR = 5;
-
-  //the base offsets
-  if (event.getChar() == 'q'){
-    base_offset[0] += suj_offset;
-  }
-  else if (event.getChar() == 'w'){
-    base_offset[1] += suj_offset;
-  }
-  else if (event.getChar() == 'e'){
-    base_offset[2] += suj_offset;
-  }
-  else if (event.getChar() == 'r'){
-    base_offset[3] += suj_offset;
-  }
-  else if (event.getChar() == 't'){
-    base_offset[4] += suj_offset;
-  }
-  else if (event.getChar() == 'y'){
-    base_offset[5] += suj_offset;
-  }
-  else if (event.getChar() == 'Q'){
-    base_offset[0] -= suj_offset;
-  }
-  else if (event.getChar() == 'W'){
-    base_offset[1] -= suj_offset;
-  }
-  else if (event.getChar() == 'E'){
-    base_offset[2] -= suj_offset;
-  }
-  else if (event.getChar() == 'R'){
-    base_offset[3] -= suj_offset;
-  }
-  else if (event.getChar() == 'T'){
-    base_offset[4] -= suj_offset;
-  }
-  else if (event.getChar() == 'Y'){
-    base_offset[5] -= suj_offset;
-  }
-
-  //the arm offset
-  else if (event.getChar() == 'z'){
-    arm_offset[0] += j_offset;
-  }
-  else if (event.getChar() == 'x'){
-    arm_offset[1] += j_offset;
-  }
-  else if (event.getChar() == 'c'){
-    arm_offset[2] += j_offset;
-  }
-  else if (event.getChar() == 'v'){
-    arm_offset[3] += SCALE_FACTOR * j_offset;
-  }
-  else if (event.getChar() == 'b'){
-    arm_offset[4] += SCALE_FACTOR * j_offset;
-  }
-  else if (event.getChar() == 'n'){
-    arm_offset[5] += SCALE_FACTOR * j_offset;
-  }
-  else if (event.getChar() == 'm'){
-    arm_offset[6] += SCALE_FACTOR * j_offset;
-  }
-  else if (event.getChar() == 'Z'){
-    arm_offset[0] -= suj_offset;
-  }
-  else if (event.getChar() == 'X'){
-    arm_offset[1] -= suj_offset;
-  }
-  else if (event.getChar() == 'C'){
-    arm_offset[2] -= suj_offset;
-  }
-  else if (event.getChar() == 'V'){
-    arm_offset[3] -= SCALE_FACTOR * j_offset;
-  }
-  else if (event.getChar() == 'B'){
-    arm_offset[4] -= SCALE_FACTOR * j_offset;
-  }
-  else if (event.getChar() == 'N'){
-    arm_offset[5] -= SCALE_FACTOR * j_offset;
-  }
-  else if (event.getChar() == 'M'){
-    arm_offset[6] -= SCALE_FACTOR * j_offset;
-  }
-
-  console() << "Trackable " << model_idx << " base offset is : \n[";
-  for (size_t i = 0; i < base_offset.size(); ++i){
-    console() << base_offset[i];
-    if (i != base_offset.size() - 1)  console() << ", ";
-  }
-  console() << "]\n";
-  console() << "Trackable " << model_idx << " offset is : \n[";
-  for (size_t i = 0; i < arm_offset.size(); ++i){
-    console() << arm_offset[i];
-    if (i != arm_offset.size() - 1)  console() << ", ";
-  }
-  console() << "]" << std::endl;
-
-}
-
