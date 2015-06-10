@@ -1,6 +1,24 @@
-/*
-Modified from original by Philip Pratt, Imperial College London
-*/
+/**
+
+viz - A robotics visualizer specialized for the da Vinci robotic system.
+Copyright (C) 2014 Max Allan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+This file was based on work by Philip Pratt, Imperial College London. Used with permission.
+
+**/
 
 #include "davinci.hpp"
 
@@ -27,6 +45,7 @@ const float PI_4 = 0.785398163397448309616f;
 #define _23 14
 #define _33 15
 
+// da Vinci coordinates are in meters but we always work in mm.
 const double SCALE = 1000;
 
 DaVinciKinematicChain::DaVinciKinematicChain(void){
@@ -46,10 +65,10 @@ DaVinciKinematicChain::DaVinciKinematicChain(void){
   mSUJ1TipPSM1Origin.push_back(GeneralFrame(0.478f, 0.0f, 0.1524f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
   // Denavit-Hartenberg parameters from PSM1 origin to PSM1 tip (assumes needle driver instrument)
-  float PSM1_lenRCC = 0.4318f;
-  float PSM1_ToolLen = 0.4159f;
-  float PSM1_PitchToYaw = 0.009f;
-  float PSM1_YawToCtrlPnt = 0.0f;
+  const float PSM1_lenRCC = 0.4318f;
+  const float PSM1_ToolLen = 0.4159f;
+  const float PSM1_PitchToYaw = 0.009f;
+  const float PSM1_YawToCtrlPnt = 0.0f;
   mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(1, JointTypeEnum::ROTARY, 0.0f, PI_2, 0.0f, PI_2));
   mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(2, JointTypeEnum::ROTARY, 0.0f, -PI_2, 0.0f, -PI_2));
   mPSM1OriginPSM1Tip.push_back(DenavitHartenbergFrame(3, JointTypeEnum::PRISMATIC, 0.0f, PI_2, -PSM1_lenRCC, 0.0f));
@@ -74,10 +93,10 @@ DaVinciKinematicChain::DaVinciKinematicChain(void){
   mSUJ2TipPSM2Origin.push_back(GeneralFrame(0.478f, 0.0f, 0.1524f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
   // Denavit-Hartenberg parameters from PSM2 origin to PSM2 tip (assumes needle driver instrument)
-  float PSM2_lenRCC = 0.4318f;
-  float PSM2_ToolLen = 0.4159f;
-  float PSM2_PitchToYaw = 0.009f;
-  float PSM2_YawToCtrlPnt = 0.0f;
+  const float PSM2_lenRCC = 0.4318f;
+  const float PSM2_ToolLen = 0.4159f;
+  const float PSM2_PitchToYaw = 0.009f;
+  const float PSM2_YawToCtrlPnt = 0.0f;
   mPSM2OriginPSM2Tip.push_back(DenavitHartenbergFrame(1, JointTypeEnum::ROTARY, 0.0f, PI_2, 0.0f, PI_2));
   mPSM2OriginPSM2Tip.push_back(DenavitHartenbergFrame(2, JointTypeEnum::ROTARY, 0.0f, -PI_2, 0.0f, -PI_2));
   mPSM2OriginPSM2Tip.push_back(DenavitHartenbergFrame(3, JointTypeEnum::PRISMATIC, 0.0f, PI_2, -PSM2_lenRCC, 0.0f));
@@ -101,8 +120,8 @@ DaVinciKinematicChain::DaVinciKinematicChain(void){
   mSUJ3TipECM1Origin.push_back(GeneralFrame(0.6126f, 0.0f, 0.1016f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f));
 
   // Denavit-Hartenberg parameters from ECM1 origin to ECM1 tip (assumes Olympus 0 degree stereo scope)
-  float ECM1_lenRCC = 0.3822f;
-  float ECM1_ScopeLen = 0.3828f;
+  const float ECM1_lenRCC = 0.3822f;
+  const float ECM1_ScopeLen = 0.3828f;
   mECM1OriginECM1Tip.push_back(DenavitHartenbergFrame(1, JointTypeEnum::ROTARY, 0.0f, PI_2, 0.0f, PI_2));
   mECM1OriginECM1Tip.push_back(DenavitHartenbergFrame(2, JointTypeEnum::ROTARY, 0.0f, -PI_2, 0.0f, -PI_2));
   mECM1OriginECM1Tip.push_back(DenavitHartenbergFrame(3, JointTypeEnum::PRISMATIC, 0.0f, PI_2, -ECM1_lenRCC, 0.0f));
@@ -113,7 +132,6 @@ DaVinciKinematicChain::DaVinciKinematicChain(void){
   
 }
 
-
 // Set identity matrix
 void viz::davinci::glhSetIdentity(GLdouble* A){
 
@@ -123,8 +141,6 @@ void viz::davinci::glhSetIdentity(GLdouble* A){
   A[_30] = 0.0; A[_31] = 0.0; A[_32] = 0.0; A[_33] = 1.0;
 
 }
-
-/******************************************************************************************************************************/
 
 // Matrix multiplication (B = BA)
 void viz::davinci::glhMultMatrixRight(const GLdouble* A, GLdouble* B){
@@ -203,7 +219,7 @@ void viz::davinci::glhDenavitHartenberg(GLdouble a, GLdouble alpha, GLdouble d, 
 
 }
 
-void viz::davinci::extendChain(const DenavitHartenbergFrame& frame, GLdouble* A, float angle = 0.0) {
+void viz::davinci::extendChain(const DenavitHartenbergFrame& frame, GLdouble* A, float delta = 0.0) {
 
   GLdouble DH[16];
 
@@ -214,19 +230,17 @@ void viz::davinci::extendChain(const DenavitHartenbergFrame& frame, GLdouble* A,
     break;
 
   case JointTypeEnum::ROTARY:
-    glhDenavitHartenberg(frame.mA * SCALE, frame.mAlpha, frame.mD * SCALE, frame.mTheta + angle, DH);
+    glhDenavitHartenberg(frame.mA * SCALE, frame.mAlpha, frame.mD * SCALE, frame.mTheta + delta, DH);
     break;
 
   case JointTypeEnum::PRISMATIC:
-    glhDenavitHartenberg(frame.mA * SCALE, frame.mAlpha, (frame.mD + angle) * SCALE, frame.mTheta, DH);
+    glhDenavitHartenberg(frame.mA * SCALE, frame.mAlpha, (frame.mD + delta) * SCALE, frame.mTheta, DH);
     break;
   }
 
   glhMultMatrixRight(DH, A);
 
 }
-
-/******************************************************************************************************************************/
 
 // Concatenate chain transformations
 void viz::davinci::buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2) {
@@ -253,38 +267,37 @@ void viz::davinci::buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain,
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[4], A, psm.jnt_pos[4]);
   wrist_pitch = ci::Matrix44d(A);
 
-  //don't actually care about wrist yaw as the clasper pose 'contains' this information
   extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[5], A, psm.jnt_pos[5]);
   ci::Matrix44f wrist_yaw = ci::Matrix44d(A);
 
-  //transform into the clasper reference frame
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A, 0);  //no dh param here as this just points in the direction of the instrument head
+  //no dh param here as this just points in the direction of the instrument head
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A, 0);  
 
   //rotate the instrument claspers around the clasper axis 
   grip1 = ci::Matrix44d(A);
   grip2 = ci::Matrix44d(A);
 
   //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
-  double val = psm.jnt_pos[6];
+  double clasper_angle = psm.jnt_pos[6];
 
-  ci::Matrix44d test; test.setToIdentity();
-  test = test.createRotation(ci::Vec3f(0, 1, 0), 0.5*val);
+  ci::Matrix44d clasper_rotation; 
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), 0.5*clasper_angle);
+  
   ci::Matrix44d grip1d = grip1;
   ci::Matrix44d grip2d = grip2;
 
-  glhMultMatrixRight(test.m, grip1d.m);
+  glhMultMatrixRight(clasper_rotation.m, grip1d.m);
 
-  test.setToIdentity();
-  test = test.createRotation(ci::Vec3f(0, 1, 0), -0.5*val);
-  glhMultMatrixRight(test.m, grip2d.m);
-
+  clasper_rotation.setToIdentity();
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), -0.5*clasper_angle);
+  glhMultMatrixRight(clasper_rotation.m, grip2d.m);
 
   grip1 = grip1d;
   grip2 = grip2d;
 
 }
 
-void viz::davinci::buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2){
+void viz::davinci::buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, const ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2){
 
   ci::Matrix44d A = roll;
 
@@ -296,28 +309,26 @@ void viz::davinci::buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciC
   ci::Matrix44f wrist_yaw = ci::Matrix44d(A);
 
   //transform into the clasper reference frame
-  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A, 0);  //no dh param here as this just points in the direction of the instrument head
+  //no dh param here as this just points in the direction of the instrument head
+  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A, 0);  
 
   //rotate the instrument claspers around the clasper axis 
   grip1 = ci::Matrix44d(A);
   grip2 = ci::Matrix44d(A);
 
   //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
-  double val = psm.jnt_pos[2];
+  double clasper_angle = psm.jnt_pos[2];
 
-  ci::Matrix44d test; test.setToIdentity();
-  test = test.createRotation(ci::Vec3f(0, 1, 0), val);
+  ci::Matrix44d clasper_rotation; 
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), clasper_angle);
   ci::Matrix44d grip1d = grip1;
   ci::Matrix44d grip2d = grip2;
 
-  //grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
-  glhMultMatrixRight(test.m, grip1d.m);
+  glhMultMatrixRight(clasper_rotation.m, grip1d.m);
 
-  test.setToIdentity();
-  test = test.createRotation(ci::Vec3f(0, 1, 0), -val);
-  glhMultMatrixRight(test.m, grip2d.m);
-
-
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), -clasper_angle);
+  glhMultMatrixRight(clasper_rotation.m, grip2d.m);
+  
   grip1 = grip1d;
   grip2 = grip2d;
 
@@ -348,7 +359,7 @@ void viz::davinci::buildKinematicChainECM1(DaVinciKinematicChain &mDaVinciChain,
 
 }
 
-void viz::davinci::buildKinematicChainAtEndPSM2(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2){
+void viz::davinci::buildKinematicChainAtEndPSM2(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, const ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2){
 
   ci::Matrix44d A = roll;
 
@@ -360,27 +371,25 @@ void viz::davinci::buildKinematicChainAtEndPSM2(DaVinciKinematicChain &mDaVinciC
   ci::Matrix44f wrist_yaw = ci::Matrix44d(A);
 
   //transform into the clasper reference frame
-  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A, 0);  //no dh param here as this just points in the direction of the instrument head
+  //no dh param here as this just points in the direction of the instrument head
+  extendChain(mDaVinciChain.mPSM2OriginPSM2Tip[6], A, 0); 
 
   //rotate the instrument claspers around the clasper axis 
   grip1 = ci::Matrix44d(A);
   grip2 = ci::Matrix44d(A);
 
   //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
-  double val = psm.jnt_pos[2];
+  double clasper_angle = psm.jnt_pos[2];
 
-  ci::Matrix44d test; test.setToIdentity();
-  test = test.createRotation(ci::Vec3f(0, 1, 0), val);
+  ci::Matrix44d clasper_rotation; 
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), clasper_angle);
   ci::Matrix44d grip1d = grip1;
   ci::Matrix44d grip2d = grip2;
 
-  //grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
-  glhMultMatrixRight(test.m, grip1d.m);
+  glhMultMatrixRight(clasper_rotation.m, grip1d.m);
 
-  test.setToIdentity();
-  test = test.createRotation(ci::Vec3f(0, 1, 0), -val);
-  glhMultMatrixRight(test.m, grip2d.m);
-
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), -clasper_angle);
+  glhMultMatrixRight(clasper_rotation.m, grip2d.m);
 
   grip1 = grip1d;
   grip2 = grip2d;
@@ -416,31 +425,26 @@ void viz::davinci::buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain,
   ci::Matrix44f wrist_yaw = ci::Matrix44d(A);
 
   //transform into the clasper reference frame
-  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A, 0);  //no dh param here as this just points in the direction of the instrument head
+  //no dh param here as this just points in the direction of the instrument head
+  extendChain(mDaVinciChain.mPSM1OriginPSM1Tip[6], A, 0);  
 
   //rotate the instrument claspers around the clasper axis 
   grip1 = ci::Matrix44d(A);
   grip2 = ci::Matrix44d(A);
 
   //this is the angle between the claspers, so each clasper rotates 0.5*angle away from the center point
-  double val = psm.jnt_pos[6];
+  double clasper_angle = psm.jnt_pos[6];
 
-  ci::Matrix44d test; test.setToIdentity();
-  test = test.createRotation(ci::Vec3f(0, 1, 0), 0.5*val);
+  ci::Matrix44d clasper_rotation; 
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), 0.5*clasper_angle);
   ci::Matrix44d grip1d = grip1;
   ci::Matrix44d grip2d = grip2;
 
-  //grip1.rotate(ci::Vec3d(0, 1, 0), 0.5*val);
-  glhMultMatrixRight(test.m, grip1d.m);
+  glhMultMatrixRight(clasper_rotation.m, grip1d.m);
 
-
-  //grip2.rotate(ci::Vec3d(0, 0, 1), M_PI);
-  //grip2.rotate(ci::Vec3d(0, 1, 0), -0.5*val);
-  test.setToIdentity();
-  test = test.createRotation(ci::Vec3f(0, 1, 0), -0.5*val);
-  glhMultMatrixRight(test.m, grip2d.m);
-
-
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), -0.5*clasper_angle);
+  glhMultMatrixRight(clasper_rotation.m, grip2d.m);
+  
   grip1 = grip1d;
   grip2 = grip2d;
 

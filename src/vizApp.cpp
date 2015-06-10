@@ -1,7 +1,26 @@
+/**
+
+viz - A robotics visualizer specialized for the da Vinci robotic system.
+Copyright (C) 2014 Max Allan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+**/
+
 #include <CinderOpenCV.h>
 #include <locale>
 #include <cinder/gl/Vbo.h>
-
 #include <opencv2/highgui/highgui.hpp>
 
 #include "../include/config_reader.hpp"
@@ -98,7 +117,7 @@ void vizApp::setupFromConfig(const std::string &path){
 
     }
 
-    //loadTrackables(reader, output_dir_this_run);
+    loadTrackables(reader, output_dir_this_run);
 
   }
   catch (std::runtime_error){
@@ -162,16 +181,7 @@ void vizApp::setupGUI(){
     ss << "Edit instrument " << i << " pose";
     gui_->addButton(ss.str(), std::bind(&vizApp::editPoseButton, this, i+1));
   }
-  
 
-  //mParams->addParam("Cube Size", &mObjSize, "min=0.1 max=20.5 step=0.5 keyIncr=z keyDecr=Z");
-  //mParams->addParam("Cube Rotation", &mObjOrientation);
-  //mParams->addParam("Cube Color", &mColor, "");
-  //mParams->addSeparator();
-  //mParams->addParam("Light Direction", &mLightDirection, "");
-  //mParams->addButton("Button!", std::bind(&TweakBarApp::button, this));
-  //mParams->addText("text", "label=`This is a label without a parameter.`");
-  //mParams->addParam("String ", &mString, "");
 
 }
 
@@ -505,12 +515,9 @@ void vizApp::drawCamera(gl::Texture &left_image_data, gl::Texture &right_image_d
   }
 
   ci::Vec3f vertex[8];
-  //ci::Vec4<unsigned char> color[8];
 
   glEnableClientState(GL_VERTEX_ARRAY);
-  //glEnableClientState(GL_COLOR_ARRAY);
   glVertexPointer(3, GL_FLOAT, 0, &vertex[0].x);
-  //glColorPointer(3, GL_UNSIGNED_BYTE, 0, &color[0].x);
 
   vertex[0] = left_cam_center;
   vertex[1] = left_cam_bottom_left;
@@ -520,8 +527,6 @@ void vizApp::drawCamera(gl::Texture &left_image_data, gl::Texture &right_image_d
   vertex[5] = left_cam_top_left;
   vertex[6] = left_cam_center;
   vertex[7] = left_cam_top_right;
-
-  //for (int i = 0; i < 8; ++i) color[i] = ci::Vec3<unsigned char>(255, 255, 255);
 
   glDrawArrays(GL_LINES, 0, 8);
 
@@ -551,7 +556,6 @@ void vizApp::drawCamera(gl::Texture &left_image_data, gl::Texture &right_image_d
 
   glLineWidth(1.0f);
   glDisableClientState(GL_VERTEX_ARRAY);
-  //glDisableClientState(GL_COLOR_ARRAY);
   
 }
 

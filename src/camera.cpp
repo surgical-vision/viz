@@ -1,3 +1,23 @@
+/**
+
+viz - A robotics visualizer specialized for the da Vinci robotic system.
+Copyright (C) 2014 Max Allan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+**/
+
 #include "../include/camera.hpp"
 #include <cinder/gl/gl.h>
 #include <cinder/app/App.h>
@@ -67,7 +87,6 @@ void StereoCamera::Setup(const std::string &calibration_filename, const int near
     size_t image_height = image_size.at<int>(1);
 
     convertBouguetToGLCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
-    //convertBouguetToDaVinciCoordinates(l_intrinsic, r_intrinsic, rotation, translation, image_width, image_height);
 
     left_eye_.Setup(l_intrinsic, l_distortion, image_width, image_height, near_clip_distance, far_clip_distance);
     right_eye_.Setup(r_intrinsic, r_distortion, image_width, image_height, near_clip_distance, far_clip_distance);
@@ -97,27 +116,6 @@ void StereoCamera::convertBouguetToGLCoordinates(cv::Mat &left_camera_matrix, cv
 
   extrinsic_rotation = extrinsic_rotation.inv();
   extrinsic_translation = extrinsic_translation * -1;
-
-}
-
-void StereoCamera::convertBouguetToDaVinciCoordinates(cv::Mat &left_camera_matrix, cv::Mat &right_camera_matrix, cv::Mat &extrinsic_rotation, cv::Mat &extrinsic_translation, const int image_width, const int image_height){
-
-  //first flip the principal points
-  left_camera_matrix.at<double>(1, 2) = image_height - left_camera_matrix.at<double>(1, 2);
-  right_camera_matrix.at<double>(1, 2) = image_height - right_camera_matrix.at<double>(1, 2);
-
-  //set the rotation matrix
-  cv::Mat inv_rotation = extrinsic_rotation.inv();
-  
-  cv::Mat flip = cv::Mat::eye(3, 3, CV_64FC1);
-  //flip.at<double>(1, 1) = -1; flip.at<double>(2, 2) = -1;
-  flip.at<double>(1, 1) = -1; flip.at<double>(0, 0) = -1;
-  cv::Mat in_gl_coords = flip * inv_rotation * flip;
-  extrinsic_rotation = in_gl_coords.clone();
-
-  //set the translation matrix by flipping z ( basically flip everything (we use inv transforms) then flip y and z so just flip x to get same result)
-  //extrinsic_translation = 0.1 * extrinsic_translation;
-  extrinsic_translation.at<double>(2, 0) *= -1;
 
 }
 

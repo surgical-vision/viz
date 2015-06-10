@@ -1,3 +1,23 @@
+/**
+
+viz - A robotics visualizer specialized for the da Vinci robotic system.
+Copyright (C) 2014 Max Allan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+**/
+
 #include "../include/sub_window.hpp"
 #include "../include/vizApp.hpp"
 
@@ -50,14 +70,14 @@ void SubWindow::UnBind() {
   framebuffer_->unbindFramebuffer();
 }
 
-bool SubWindow::CanSave() { 
+bool SubWindow::CanSave() const {
 
   return can_save_; 
 
 }
 
 
-bool SubWindow::IsSaving() const{
+bool SubWindow::IsSaving() const {
   
   return writer_.isOpened();
 
@@ -91,15 +111,10 @@ void SubWindow::Draw(ci::params::InterfaceGlRef params, ci::Vec2i tl, ci::Vec2i 
 }
 
 void SubWindow::Draw(){
-
-  //cv::Mat i = toOcv(framebuffer_->getTexture());
-  //cv::Mat j;
-  //cv::resize(i, j, cv::Size(window_coords_.getWidth(), window_coords_.getHeight()));
-  //ci::gl::Texture t = fromOcv(j);
   
   ci::Rectf window_with_buffer = GetRectWithBuffer();
 
-  ci::gl::draw(framebuffer_->getTexture(), window_with_buffer);// ci::Rectf(window_coords_.x1, window_coords_.y2, window_coords_.x2, window_coords_.y1));
+  ci::gl::draw(framebuffer_->getTexture(), window_with_buffer);
 
   if (can_save_){
     Draw(save_params_, window_with_buffer.getUpperLeft() + ci::Vec2i(10, 10), ci::Vec2i(200, 50));

@@ -1,3 +1,23 @@
+/**
+
+viz - A robotics visualizer specialized for the da Vinci robotic system.
+Copyright (C) 2014 Max Allan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+**/
+
 #include "../include/video.hpp"
 #include <opencv2/highgui/highgui_c.h>
 #include <opencv2/opencv.hpp>
@@ -47,7 +67,7 @@ VideoIO::VideoIO(const std::string &inpath, const std::string &outpath) : VideoI
     image_height_ = cap_.get(CV_CAP_PROP_FRAME_HEIGHT);
   } 
 
-  writer_.open(outpath, CV_FOURCC('D','I','B',' '), 25, cv::Size(image_width_, image_height_));
+  writer_.open(outpath, CV_FOURCC('M','J','P','G'), 25, cv::Size(image_width_, image_height_));
 
   if (!writer_.isOpened()) throw std::runtime_error("Error, could not open output video file");
 

@@ -1,3 +1,23 @@
+/**
+
+viz - A robotics visualizer specialized for the da Vinci robotic system.
+Copyright (C) 2014 Max Allan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+**/
+
 #include <cinder/Quaternion.h>
 #include <cinder/app/App.h>
 
@@ -461,26 +481,6 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
 
       shaft_pose_.setTranslate(translation);
       do_draw_ = true;
-      /*while (1)
-      {
-        std::getline(ifs_, line);
-        if (row == 4) break;
-        if (line[0] == '#' || line.length() < 1) continue;
-        std::stringstream ss(line);
-        for (int col = 0; col < 4; ++col){
-          float val;
-          ss >> val;
-          shaft_pose_.at(row, col) = val;
-        }
-        row++;
-      }
-      do_draw_ = true;
-
-      for (int i = 0; i < num_wrist_joints_; ++i){
-        double x;
-        ifs_ >> x;
-        wrist_dh_params_[i] = x;
-      }*/
 
       // update the list of previous poses for plotting trajectories.
       reference_frame_tracks_.push_back(shaft_pose_);

@@ -1,5 +1,27 @@
 #pragma once 
 
+/**
+
+viz - A robotics visualizer specialized for the da Vinci robotic system.
+Copyright (C) 2014 Max Allan
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+This file was based on work by Philip Pratt, Imperial College London. Used with permission.
+
+**/
+
 #include <vector>
 
 #include "camera.hpp"
@@ -124,51 +146,131 @@ namespace viz {
 
     };
 
+    /**
+    * @struct DaVinciKinematicChain
+    * A kinematic chain representing a da Vinci classic robot with 2 PSMs and 1 ECM.
+    */
     struct DaVinciKinematicChain {
 
+      /**
+      * Sets up the arm parameters and builds the kinematic chain for a classic da Vinci (as these are constant).
+      */
       DaVinciKinematicChain();
 
       // PSM1
-      std::vector<GeneralFrame> mWorldOriginSUJ1Origin;
-      std::vector<DenavitHartenbergFrame> mSUJ1OriginSUJ1Tip;
-      std::vector<GeneralFrame> mSUJ1TipPSM1Origin;
-      std::vector<DenavitHartenbergFrame> mPSM1OriginPSM1Tip;
+      std::vector<GeneralFrame> mWorldOriginSUJ1Origin; /**< The set of transforms between the robot origin and the start of the set up joints on PSM1. */
+      std::vector<DenavitHartenbergFrame> mSUJ1OriginSUJ1Tip;  /**< The set of transforms between the start of the set up joints and the end of the set up joints on PSM1. */
+      std::vector<GeneralFrame> mSUJ1TipPSM1Origin;  /**< The set of transforms between the end of the set up joints and the start of the arm joints on PSM1. */
+      std::vector<DenavitHartenbergFrame> mPSM1OriginPSM1Tip;  /**< The set of transforms between the start of the arm joints and the end of the arm joints on PSM1. */
 
       // PSM2
-      std::vector<GeneralFrame> mWorldOriginSUJ2Origin;
-      std::vector<DenavitHartenbergFrame> mSUJ2OriginSUJ2Tip;
-      std::vector<GeneralFrame> mSUJ2TipPSM2Origin;
-      std::vector<DenavitHartenbergFrame> mPSM2OriginPSM2Tip;
+      std::vector<GeneralFrame> mWorldOriginSUJ2Origin;  /**< The set of transforms between the robot origin and the start of the set up joints on PSM2. */
+      std::vector<DenavitHartenbergFrame> mSUJ2OriginSUJ2Tip;  /**< The set of transforms between the start of the set up joints and the end of the set up joints on PSM2. */
+      std::vector<GeneralFrame> mSUJ2TipPSM2Origin;  /**< The set of transforms between the end of the set up joints and the start of the arm joints on PSM2. */
+      std::vector<DenavitHartenbergFrame> mPSM2OriginPSM2Tip; /**< The set of transforms between the start of the arm joints and the end of the arm joints on PSM2. */
 
       // ECM1
-      std::vector<GeneralFrame> mWorldOriginSUJ3Origin;
-      std::vector<DenavitHartenbergFrame> mSUJ3OriginSUJ3Tip;
-      std::vector<GeneralFrame> mSUJ3TipECM1Origin;
-      std::vector<DenavitHartenbergFrame> mECM1OriginECM1Tip;
+      std::vector<GeneralFrame> mWorldOriginSUJ3Origin; /**< The set of transforms between the robot origin and the start of the set up joints on ECM1. */
+      std::vector<DenavitHartenbergFrame> mSUJ3OriginSUJ3Tip;  /**< The set of transforms between the start of the set up joints and the end of the set up joints on ECM1. */
+      std::vector<GeneralFrame> mSUJ3TipECM1Origin;  /**< The set of transforms between the end of the set up joints and the start of the arm joints on ECM1. */
+      std::vector<DenavitHartenbergFrame> mECM1OriginECM1Tip; /**< The set of transforms between the start of the arm joints and the end of the arm joints on ECM1. */
+
     };
 
+    /**
+    * Helper function to initialise a 4x4 rigid body transform to the indentity matrix. Uses OpenGL format so matrix is column major.
+    * @param[out] The identity matrix.
+    */
     void glhSetIdentity(GLdouble* A);
 
+    /**
+    * Helper function to multiply two matrices in the order BA. Uses OpenGL format so matrix is column major.
+    * @param[in] A The right matrix.
+    * @param[in,out] B The left matrix. Also stores the result.
+    */
     void glhMultMatrixRight(const GLdouble* A, GLdouble* B);
 
+    /**
+    * Transform a reference frame A on a rigid body by a GeneralFrame transform as A = A*frame
+    * @param[in] frame The rigid body reference frame transform.
+    * @param[in,out] A The current reference frame which is updated by frame.
+    */
     void extendChain(const GeneralFrame& frame, GLdouble* A);
 
+    /**
+    * Construct a rigid body transform from the DH parameters. This is using the modified DH paramter representation.
+    * @param[in] a The length of the common normal between the links that the transform describes.
+    * @param[in] alpha The angle about the common normal between the links that transform describes.
+    * @param[in] d The angle about the common normal between the links that transform describes.
+    * @param[in] theta The angle about the common normal between the links that transform describes.
+    * @param[out] A The output transformation matrix.
+    */
     void glhDenavitHartenberg(const double a, const double alpha, const double d, const double theta, GLdouble *A);
 
-    void extendChain(const DenavitHartenbergFrame& frame, GLdouble* A, float angle);
+    /**
+    * Transform a reference frame A on a rigid body by a DenavitHartenberg transform as A = A*frame. The DH frame has moved from its 'home' position which we specified in the DH parameters when we constructed it to a new position by rotation or translating by the amount @delta.
+    * @param[in] frame The rigid body reference frame transform.
+    * @param[in,out] A The current reference frame which is updated by frame.
+    * @param[in] delta The change to the rotatry or translation joint.
+    */
+    void extendChain(const DenavitHartenbergFrame& frame, GLdouble* A, float delta);
 
+    /**
+    * Build the kinematic chain for PSM1 at the current pose. 
+    * Gives the useful transforms from the robot world coordinates to the coordinates of the instrument at the end of the arm.
+    * @param[in] mDaVinciChain The kinematic chain representing the PSM1.
+    * @param[in] psm The current pose information describing the position of the PSM.
+    * @param[out] roll The transform from the robot world coordinates to the instrument roll axis.
+    * @param[out] wrist_pitch The transform from the robot world coordinates to the instrument wrist coordinates. 
+    * @param[out] grip1 The transform from the robot world coordinates to first instrument grip. Not really sure how to describe 'which' of the 2 grips this is...
+    * @param[out] grip2 The transform from the robot world coordinates to second instrument grip.
+    */
     void buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2);
 
-    void buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2);
+    /**
+    * Build the kinematic chain for PSM1 when we know the transform from camera to roll coordinates (for example because we tracked its pose using a vision method). 
+    * Gives the useful transforms from the robot world coordinates to the coordinates of the instrument at the end of the arm.
+    * @param[in] mDaVinciChain The kinematic chain representing the PSM1.
+    * @param[in] psm The current pose information describing the position of the PSM.
+    * @param[in] roll The transform from the robot world coordinates to the instrument roll axis.
+    * @param[out] wrist_pitch The transform from the robot world coordinates to the instrument wrist coordinates.
+    * @param[out] grip1 The transform from the robot world coordinates to first instrument grip. Not really sure how to describe 'which' of the 2 grips this is...
+    * @param[out] grip2 The transform from the robot world coordinates to second instrument grip.
+    */
+    void buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, const ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2);
 
+    /**
+    * Build the kinematic chain for PSM2 at the current pose.
+    * Gives the useful transforms from the robot world coordinates to the coordinates of the instrument at the end of the arm.
+    * @param[in] mDaVinciChain The kinematic chain representing the PSM2.
+    * @param[in] psm The current pose information describing the position of the PSM.
+    * @param[out] roll The transform from the robot world coordinates to the instrument roll axis.
+    * @param[out] wrist_pitch The transform from the robot world coordinates to the instrument wrist coordinates.
+    * @param[out] grip1 The transform from the robot world coordinates to first instrument grip. Not really sure how to describe 'which' of the 2 grips this is...
+    * @param[out] grip2 The transform from the robot world coordinates to second instrument grip.
+    */
     void buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2);
 
-    void buildKinematicChainAtEndPSM2(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2);
+    /**
+    * Build the kinematic chain for PSM2 when we know the transform from camera to roll coordinates (for example because we tracked its pose using a vision method).
+    * Gives the useful transforms from the robot world coordinates to the coordinates of the instrument at the end of the arm.
+    * @param[in] mDaVinciChain The kinematic chain representing the PSM2.
+    * @param[in] psm The current pose information describing the position of the PSM.
+    * @param[in] roll The transform from the robot world coordinates to the instrument roll axis.
+    * @param[out] wrist_pitch The transform from the robot world coordinates to the instrument wrist coordinates.
+    * @param[out] grip1 The transform from the robot world coordinates to first instrument grip. Not really sure how to describe 'which' of the 2 grips this is...
+    * @param[out] grip2 The transform from the robot world coordinates to second instrument grip.
+    */
+    void buildKinematicChainAtEndPSM2(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, const ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2);
 
+    /**
+    * Build the kinematic chain for ECM at the current pose.
+    * Gives the useful transforms from the robot world coordinates to the coordinates of the camera at the end of the arm.
+    * @param[in] mDaVinciChain The kinematic chain representing the ECM.
+    * @param[in] ecm The current pose information describing the position of the ECM.
+    * @param[out] world_to_camera_transform The transform from the robot world coordinates to the camera reference frame.
+    */
     void buildKinematicChainECM1(DaVinciKinematicChain &mDaVinciChain, const ECMData& ecm, ci::Matrix44f &world_to_camera_transform);
 
-    void updateKinematicChain(void);
-
-    bool gluInvertMatrix(const double m[16], double invOut[16]);
   }
 }
