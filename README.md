@@ -35,7 +35,7 @@ for this example but it gives a demonstration of how the components are specifie
 Acknowledgements
 ----------------
 
-If you use this software in this work, please acknowledge the authors
+If you use this software in your work, we would be grateful if you could acknowledge the authors
 
 * [Max Allan](mailto:m.allan@cs.ucl.ac.uk), University College London
 * [Philip Pratt](mailto:p.pratt@imperial.ac.uk), Imperial College London
