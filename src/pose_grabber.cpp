@@ -34,7 +34,7 @@ inline void clean_string(std::string &str, const std::vector<char> &to_remove){
 
 size_t BasePoseGrabber::grabber_num_id_ = 0;
 
-BasePoseGrabber::BasePoseGrabber() : do_draw_(false) {
+BasePoseGrabber::BasePoseGrabber(const std::string &output_dir) : do_draw_(false) , save_dir_(output_dir) {
 
   std::stringstream ss;
   ss << "Pose grabber " << grabber_num_id_;
@@ -66,7 +66,7 @@ void BasePoseGrabber::convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::M
 
 }
 
-PoseGrabber::PoseGrabber(const ConfigReader &reader, const std::string &output_dir) {
+PoseGrabber::PoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BasePoseGrabber(output_dir) {
 
   self_name_ = "pose-grabber";
   checkSelfName(reader.get_element("name"));
@@ -81,16 +81,18 @@ PoseGrabber::PoseGrabber(const ConfigReader &reader, const std::string &output_d
 
   ifs_.exceptions(std::ifstream::eofbit);
 
-  ofs_file_ = output_dir + "/" + reader.get_element("output-pose-file");
+  save_dir_ = output_dir;
+
+  ofs_file_ = save_dir_ + "/" + reader.get_element("output-pose-file");
 
 }
 
-bool PoseGrabber::LoadPose(const bool no_reload){
+bool PoseGrabber::LoadPose(const bool update_as_new){
 
   do_draw_ = false; //set to true only if we read a 'good' pose
 
   //load the new pose (if requested).
-  if (no_reload){
+  if (update_as_new){
     try{
       std::string line;
       int row = 0;
@@ -130,7 +132,13 @@ bool PoseGrabber::LoadPose(const bool no_reload){
 
 void PoseGrabber::WritePoseToStream()  {
 
-  if (!ofs_.is_open()) ofs_.open(ofs_file_);
+  if (!ofs_.is_open()) {
+    if (!boost::filesystem::exists(save_dir_)) {
+      boost::filesystem::create_directory(save_dir_);
+    }
+    ofs_.open(ofs_file_);
+  }
+
   if (!ofs_.is_open()) throw(std::runtime_error("Error, cannot open file"));
 
   ofs_ << model_.Body().transform_ << "\n";
@@ -141,7 +149,13 @@ void PoseGrabber::WritePoseToStream()  {
 
 void PoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
-  if (!ofs_.is_open()) ofs_.open(ofs_file_);
+  if (!ofs_.is_open()) {
+    if (!boost::filesystem::exists(save_dir_)) {
+      boost::filesystem::create_directory(save_dir_);
+    }
+    ofs_.open(ofs_file_);
+  }
+
   if (!ofs_.is_open()) throw(std::runtime_error("Error, cannot open file"));
 
   ofs_ << camera_pose.inverted() * model_.Body().transform_ << "\n";
@@ -150,7 +164,7 @@ void PoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
 }
 
-BaseDaVinciPoseGrabber::BaseDaVinciPoseGrabber(const ConfigReader &reader){
+BaseDaVinciPoseGrabber::BaseDaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BasePoseGrabber(output_dir) {
   
   try{
     model_.LoadData(reader.get_element("model-file"));
@@ -177,7 +191,7 @@ void BaseDaVinciPoseGrabber::convertFromDaVinciPose(const ci::Matrix44f &in_pose
 
 }
 
-DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BaseDaVinciPoseGrabber(reader) {
+DHDaVinciPoseGrabber::DHDaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BaseDaVinciPoseGrabber(reader, output_dir) {
 
   self_name_ = "dh-davinci-grabber";
   checkSelfName(reader.get_element("name"));
@@ -319,9 +333,9 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
   }
 }
 
-bool DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
+bool DHDaVinciPoseGrabber::LoadPose(const bool update_as_new){
 
-  if (no_reload){
+  if (update_as_new){
     if (!ReadDHFromFiles(base_joints_, arm_joints_))
       return false;
   }
@@ -330,7 +344,7 @@ bool DHDaVinciPoseGrabber::LoadPose(const bool no_reload){
   GetPose();
 
   // update the list of previous poses for plotting trajectories.
-  if (no_reload){
+  if (update_as_new){
     reference_frame_tracks_.push_back(model_.Shaft().transform_);
   }
 
@@ -368,9 +382,15 @@ bool DHDaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_base_joints,
 
 void DHDaVinciPoseGrabber::WritePoseToStream()  {
 
-  if (!se3_ofs_.is_open()) se3_ofs_.open(se3_ofs_file_);
-  if (!arm_ofs_.is_open()) arm_ofs_.open(arm_ofs_file_);
-  if (!base_ofs_.is_open()) base_ofs_.open(base_ofs_file_);
+  if (!se3_ofs_.is_open()) {
+    if (!boost::filesystem::exists(save_dir_)) {
+      boost::filesystem::create_directory(save_dir_);
+    }
+    se3_ofs_.open(se3_ofs_file_);
+    arm_ofs_.open(arm_ofs_file_);
+    base_ofs_.open(base_ofs_file_);
+  }
+
   if (!se3_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
   if (!arm_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
   if (!base_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
@@ -396,9 +416,15 @@ void DHDaVinciPoseGrabber::WritePoseToStream()  {
 
 void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
-  if (!se3_ofs_.is_open()) se3_ofs_.open(se3_ofs_file_);
-  if (!arm_ofs_.is_open()) arm_ofs_.open(arm_ofs_file_);
-  if (!base_ofs_.is_open()) base_ofs_.open(base_ofs_file_);
+  if (!se3_ofs_.is_open()) {
+    if (!boost::filesystem::exists(save_dir_)) {
+      boost::filesystem::create_directory(save_dir_);
+    }
+    se3_ofs_.open(se3_ofs_file_);
+    arm_ofs_.open(arm_ofs_file_);
+    base_ofs_.open(base_ofs_file_);
+  }
+
   if (!se3_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
   if (!arm_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
   if (!base_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
@@ -421,7 +447,7 @@ void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  
 
 }
 
-SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BaseDaVinciPoseGrabber(reader) {
+SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BaseDaVinciPoseGrabber(reader, output_dir) {
 
   self_name_ = "se3-davinci-grabber";
   checkSelfName(reader.get_element("name"));
@@ -444,13 +470,13 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
 
 }
 
-bool SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
+bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
   
   do_draw_ = false; //set to true only if we read a 'good' pose
 
   assert(num_wrist_joints_ == wrist_dh_params_.size());
 
-  if (no_reload){
+  if (update_as_new){
 
     try{
       std::string line;
@@ -513,7 +539,13 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool no_reload){
 
 void SE3DaVinciPoseGrabber::WritePoseToStream() {
 
-  if (!ofs_.is_open()) ofs_.open(ofs_file_);
+  if (!ofs_.is_open()) {
+    if (!boost::filesystem::exists(save_dir_)) {
+      boost::filesystem::create_directory(save_dir_);
+    }
+    ofs_.open(ofs_file_);
+  }
+
   if (!ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
 
   ofs_ << model_.Shaft().transform_ << "\n";
@@ -525,7 +557,13 @@ void SE3DaVinciPoseGrabber::WritePoseToStream() {
 
 void SE3DaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
-  if (!ofs_.is_open()) ofs_.open(ofs_file_);
+  if (!ofs_.is_open()) {
+    if (!boost::filesystem::exists(save_dir_)) {
+      boost::filesystem::create_directory(save_dir_);
+    }
+    ofs_.open(ofs_file_);
+  }
+
   if (!ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
 
   ofs_ << camera_pose.inverted() * model_.Shaft().transform_ << "\n";

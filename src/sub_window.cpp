@@ -124,15 +124,25 @@ void SubWindow::Draw(){
 
 }
 
+
+void SubWindow::CloseStream(){
+
+  if (writer_.isOpened())
+    writer_.release();
+  
+}
+
 void SubWindow::InitSavingWindow(){
 
   std::string &save_dir = output_directory;
-  if (!boost::filesystem::exists(save_dir)) return;
+  if (!boost::filesystem::exists(save_dir)) {
+    boost::filesystem::create_directory(save_dir);
+  }
 
   std::string name = name_;
   std::replace(name.begin(), name.end(), ' ', '_');
   std::string filepath = save_dir + "/" + name + ".avi";
 
-  writer_.open(filepath, CV_FOURCC('M', 'J', 'P', 'G'), 25, cv::Size(texture_.getWidth(), texture_.getHeight()));
+  writer_.open(filepath, CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(texture_.getWidth(), texture_.getHeight()));
 
 }

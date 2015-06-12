@@ -71,6 +71,7 @@ namespace viz {
     void runVideoButton();
     void editPoseButton(const size_t item_idx);
     void resetViewerButton();
+    void savePoseButton();
 
     static void AddSubWindow(SubWindow *sbw) { sub_windows_.push_back(sbw); }
 
@@ -102,12 +103,14 @@ namespace viz {
     void setupFromConfig(const std::string &path);
     
     /**
-    * Save a frame and the current tracked object poses (useful if they have been modified within the GUI).
-    * @param[in] is_left Flag to set whether this the the left or right channel.
+    * Save the state of the current tracked object poses and any windows which are set to save their contents (useful if they have been modified within the GUI).
     */
-    void saveState(bool is_left);
-    void savePoses(bool is_left);
-    void saveFrames(gl::Texture texture, bool is_left);
+    void saveState();
+    
+    /**
+    * Save a frame and the current tracked object poses (useful if they have been modified within the GUI).
+    */
+    void savePoses();
 
     /**
     * Draw a grid on the ground plane. 

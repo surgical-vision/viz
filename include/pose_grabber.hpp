@@ -45,8 +45,9 @@ namespace viz {
 
     /**
     * Default constructor. Sets the do_draw_ flag to false so that nothing gets drawn until we've successfully read a pose value from a pose file.
+    * @param[in] output_dir The output directory to save pose files.
     */
-    BasePoseGrabber();
+    BasePoseGrabber(const std::string &output_dir);
     
     /**
     * Load the next pose value from the file. This changes the class' internal representation of its pose when it renders the model.
@@ -108,6 +109,8 @@ namespace viz {
     std::vector<ci::Matrix44f> reference_frame_tracks_; /**< Keeps track of previous SE3s to represent the model for plotting trajectories across 3D space. For articulated bodies this should be the 'global' pose of the object. */
 
     std::string self_name_;
+
+    std::string save_dir_;
 
     ci::params::InterfaceGlRef param_modifier_;
 
@@ -178,14 +181,14 @@ namespace viz {
     * Construct a base class da vinci pose grabber. This really just loads the model.
     * @param[in] reader The configuration file.
     */
-    BaseDaVinciPoseGrabber(const ConfigReader &reader);
+    BaseDaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir);
 
     /**
     * Load the next pose value from the file. This changes the class' internal representation of its pose when it renders the model.
-    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.
+    * @param[in] update_as_new Refresh the internal representation of pose by reading a new value from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.
     * @return The success of the load (false if for instance there are no poses left to read from the file).
     */
-    virtual bool LoadPose(const bool no_reload) = 0;
+    virtual bool LoadPose(const bool update_as_new) = 0;
 
     /**
     * Renders the model to the currently bound framebuffer. Assumes OpenGL context is available on current thread.
@@ -224,10 +227,10 @@ namespace viz {
 
     /**
     * Load a set of DH parameters from a file and set up the manipulator transforms using the DH chain.
-    * @param[in] no_reloa d Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within th UI to account for a rigid offset.
+    * @param[in] update_as_new Refresh the internal representation of pose by reading a new value from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.
     * @return The success of the load (false if for instance there are no poses left to read from the file).
     */
-    virtual bool LoadPose(const bool no_reload);
+    virtual bool LoadPose(const bool update_as_new);
 
     /**
     * Return the current pose estimate.
@@ -316,10 +319,10 @@ namespace viz {
 
     /**
     * Override the pose loader method which normally accepts DH parameters to accept SE3 + DH parameters.
-    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.    
+    * @param[in] update_as_new Refresh the internal representation of pose by reading a new value from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.
     * @return The success of the load (false if for instance there are no poses left to read from the file).
     */
-    virtual bool LoadPose(const bool no_reload);
+    virtual bool LoadPose(const bool update_as_new);
 
     /**
     * Return the current pose estimate.

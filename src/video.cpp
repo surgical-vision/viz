@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <opencv2/highgui/highgui_c.h>
 #include <opencv2/opencv.hpp>
 #include <boost/filesystem.hpp>
+#include <cinder/app/App.h>
 
 using namespace viz;
 
@@ -43,6 +44,9 @@ VideoIO::VideoIO(const std::string &inpath){
     image_width_ = cap_.get(CV_CAP_PROP_FRAME_WIDTH);
     image_height_ = cap_.get(CV_CAP_PROP_FRAME_HEIGHT);
   }
+
+  can_read_ = true;
+  is_open_ = true;
 
 }
 
@@ -99,14 +103,12 @@ cv::Mat VideoIO::Read(){
 
   cv::Mat f;
 
-
   if (cap_.isOpened()){
     cap_ >> f;
   }
   else if (!image_input_.empty()){
     f = image_input_.clone();
   }
-  
 
   if (f.data == 0x0){
     f = cv::Mat::zeros(cv::Size(image_width_, image_height_), CV_8UC3);

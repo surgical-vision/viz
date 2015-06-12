@@ -126,6 +126,11 @@ namespace viz {
     void InitSavingWindow();
 
     /**
+    * Close the currently open video file (if applicable).
+    */
+    void CloseStream();
+
+    /**
     * Accessor for the subwindow coordinates in the reference frame of the main window.
     * @return The window coordinates.
     */

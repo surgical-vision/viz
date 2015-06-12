@@ -89,6 +89,20 @@ void vizApp::setupFromConfig(const std::string &path){
 
     }
 
+    //create new output subdir
+    for (int n = 0;; ++n){
+      std::stringstream ss;
+      ss << reader.get_element("output-dir") << "/output" << n;
+      boost::filesystem::path output_dir(ss.str());
+      if (!boost::filesystem::is_directory(output_dir)){
+        output_dir_this_run = output_dir.string();
+        break;
+      }
+    }
+
+
+    SubWindow::output_directory = output_dir_this_run;
+
 
     if (reader.has_element("moveable-camera")){
 
@@ -124,21 +138,6 @@ void vizApp::setupFromConfig(const std::string &path){
     return;
   }
 
-  //create new output subdir
-  for (int n = 0;; ++n){
-    std::stringstream ss;
-    ss << reader.get_element("output-dir") << "/output" << n;
-    boost::filesystem::path output_dir(ss.str());
-    if (!boost::filesystem::is_directory(output_dir)){
-      boost::filesystem::create_directory(output_dir);
-      output_dir_this_run = output_dir.string();
-      break;
-    }
-  }
-
-
-  SubWindow::output_directory = output_dir_this_run;
-
   camera_image_width_ = camera_.GetLeftCamera().getImageWidth();
   camera_image_height_ = camera_.GetLeftCamera().getImageHeight();
   framebuffer_ = gl::Fbo(camera_image_width_, camera_image_height_);
@@ -152,6 +151,12 @@ void vizApp::setupFromConfig(const std::string &path){
 void vizApp::runVideoButton(){
 
   state.load_all = !state.load_all;
+
+}
+
+void vizApp::savePoseButton(){
+
+  state.save_all = !state.save_all;
 
 }
 
@@ -169,8 +174,9 @@ void vizApp::setupGUI(){
   gui_ = params::InterfaceGl::create(getWindow(), "App parameters", toPixels(Vec2i(100, 100)));
 
   gui_->addButton("Run Video", std::bind(&vizApp::runVideoButton, this));
+  gui_->addButton("Save pose data", std::bind(&vizApp::savePoseButton, this));
   gui_->addButton("Reset 3D Viewer", std::bind(&vizApp::resetViewerButton, this));
-
+  gui_->addButton("Quit", std::bind(&vizApp::shutdown, this));
 
   gui_->addSeparator();
 
@@ -277,14 +283,14 @@ void vizApp::updateModels(){
 
   if (tracked_camera_){
     if (!tracked_camera_->LoadPose(state.load_one || state.load_all)){
-      running_ = true;
+      running_ = false;
       return;
     }
   }
 
   for (size_t i = 0; i < trackables_.size(); ++i){
     if (!trackables_[i]->LoadPose(state.load_one || state.load_all)){
-      running_ = true;
+      running_ = false;
       return;
     }
   }
@@ -338,7 +344,6 @@ void vizApp::updateVideo(){
       ci::app::console() << "done 317" << std::endl;
       left_texture_ = fromOcv(resized_left);
       right_texture_ = fromOcv(resized_right);
-      state.load_one = false;
 
     }
 
@@ -348,12 +353,16 @@ void vizApp::updateVideo(){
 
 void vizApp::update(){
  
+  ci::app::console() << "entering update" << std::endl;
   if (!running_) return;
 
+  ci::app::console() << "entering update models" << std::endl;
   updateModels();
+  ci::app::console() << "exiting update models" << std::endl;
 
+  ci::app::console() << "entering update video" << std::endl;
   updateVideo();
-  
+  ci::app::console() << "exiting update video" << std::endl;
 }
 
 void vizApp::draw2D(gl::Texture &tex){
@@ -392,17 +401,17 @@ void vizApp::draw2D(gl::Texture &tex){
 
 void vizApp::drawLeftEye() {
 
-  drawEye(left_texture_, true);
+  if (!running_) return;
 
-  saveState(true);
+  drawEye(left_texture_, true);
   
 }
 
 void vizApp::drawRightEye(){
 
-  drawEye(right_texture_, false);
+  if (!running_) return;
 
-  saveState(false);
+  drawEye(right_texture_, false);
 
 }
 
@@ -410,9 +419,14 @@ void vizApp::draw(){
   
   gl::clear(Color(0, 0, 0));
 
+  if (!running_) return;
+
+  ci::app::console() << "drawing GUI " << std::endl;
+
   /** draw GUI **/
   gui_port.Draw(gui_);
-   
+
+  ci::app::console() << "drawing editor" << std::endl;
   /** draw editor **/
   if (moveable_camera_){
     editor_port.Draw(moveable_camera_->ParamModifier());
@@ -422,11 +436,15 @@ void vizApp::draw(){
     editor_port.Draw(trackables_[i]->ParamModifier());
   }
 
+  ci::app::console() << "drawing left eye" << std::endl;
+
   /** draw left eye **/
   left_eye.BindAndClear();
   drawLeftEye();
   left_eye.UnBind();
   left_eye.Draw();
+
+  ci::app::console() << "drawing right eye" << std::endl;
 
   /** draw right eye **/
   right_eye.BindAndClear();
@@ -434,16 +452,27 @@ void vizApp::draw(){
   right_eye.UnBind();
   right_eye.Draw();
 
+  ci::app::console() << "drawing scence eye" << std::endl;
+
   /** draw scene **/
   scene_viewer.BindAndClear();
   drawScene(left_texture_, right_texture_);
   scene_viewer.UnBind();
   scene_viewer.Draw();
 
+  ci::app::console() << "drawing trjec eye" << std::endl;
+
   trajectory_viewer.BindAndClear();
   drawCameraTracker();
   trajectory_viewer.UnBind();
   trajectory_viewer.Draw();
+
+  ci::app::console() << "saving stuff" << std::endl;
+
+  saveState();
+
+  state.load_one = false;
+  state.save_one = false;
 
 }
 
@@ -582,6 +611,8 @@ void vizApp::drawCameraTracker(){
 
   gl::clear(Color(0.0, 0.0, 0.0));
 
+  if (!running_) return;
+
   if (!moveable_camera_ || !tracked_camera_) return;
   if (moveable_camera_->History().size() == 0 || tracked_camera_->History().size() == 0) return;
   
@@ -609,6 +640,8 @@ void vizApp::drawCameraTracker(){
 
 void vizApp::drawScene(gl::Texture &left_image, gl::Texture &right_image){
   
+  if (!running_) return;
+
   gl::clear(Color(0.15, 0.15, 0.15));
 
   if (trackables_.size() == 0) return;
@@ -680,65 +713,36 @@ void vizApp::drawScene(gl::Texture &left_image, gl::Texture &right_image){
 
 }
 
-void vizApp::savePoses(bool is_left){
+void vizApp::savePoses(){
+  
+  ci::Matrix44f camera_pose;
+  camera_pose.setToIdentity();
 
-  if (is_left){
+  //need to use the camera pose, if we have one (i.e. it's not just identity) to set the instrument pose
+  if (moveable_camera_){
+    moveable_camera_->WritePoseToStream();
+    camera_pose = moveable_camera_->GetPose();
+  }
 
-    ci::Matrix44f camera_pose;
-    camera_pose.setToIdentity();
+  for (std::size_t i = 0; i < trackables_.size(); ++i){
+    trackables_[i]->WritePoseToStream(camera_pose);
+  }
 
-    //need to use the camera pose, if we have one (i.e. it's not just identity) to set the instrument pose
-    if (moveable_camera_){
-      moveable_camera_->WritePoseToStream();
-      camera_pose = moveable_camera_->GetPose();
-    }
-
-    for (std::size_t i = 0; i < trackables_.size(); ++i){
-      trackables_[i]->WritePoseToStream(camera_pose);
-    }
-
-    if (tracked_camera_){
-      tracked_camera_->WritePoseToStream();
-    }
-
-
+  if (tracked_camera_){
+    tracked_camera_->WritePoseToStream();
   }
 
 }
 
-void vizApp::saveFrames(gl::Texture texture, bool is_left){
+void vizApp::saveState(){
 
-  cv::Mat frame = toOcv(texture), flipped;
-  cv::flip(frame, flipped, 0);
-
-  //save the video frames
-  if (is_left){
-
-    if (video_left_.IsOpen())
-      video_left_.Write(flipped);
-    else if (stereo_video_.IsOpen()){
-      stereo_video_.Write(flipped, cv::Mat::zeros(flipped.size(), CV_8UC3));
-    }
-
-  }
-  else{
-
-    //if (video_right_.IsOpen())
-    //  video_right_.Write(flipped);
-
-  }
-
-
-
-}
-
-void vizApp::saveState(bool is_left){
+  if (!(state.load_one || state.load_all)) return;
 
   if (state.save_all || state.save_one){
     for (auto sw : sub_windows_){
       if (sw->IsSaving()) sw->WriteFrameToFile();
     }
-    savePoses(is_left);
+    savePoses();
     state.save_one = false;
   }
 
@@ -755,10 +759,17 @@ void vizApp::shutdown(){
   if (moveable_camera_) moveable_camera_.reset();
   if (tracked_camera_) tracked_camera_.reset();
 
+  for (auto sw : sub_windows_){
+    if (sw->CanSave()) sw->CloseStream();
+  }
+
   video_left_.CloseStreams();
   video_right_.CloseStreams();
 
+  running_ = false;
+
   AppNative::shutdown();
+  AppNative::quit();
 
 }
 
