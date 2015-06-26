@@ -269,7 +269,7 @@ void DHDaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const s
     ss >> base_offsets_[i];
     std::stringstream ss;
     ss << "SU Joint " << i;
-    param_modifier_->addParam(ss.str(), &(base_offsets_[i]), "min=0 max=1 step= 0.0001 keyIncr=z keyDecr=Z");
+    param_modifier_->addParam(ss.str(), &(base_offsets_[i]), "min=-1 max=1 step= 0.0001 keyIncr=z keyDecr=Z");
   }
 
   param_modifier_->addSeparator();
@@ -281,7 +281,10 @@ void DHDaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const s
     ss >> arm_offsets_[i];
     std::stringstream ss;
     ss << "Joint " << i;
-    param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=0 max=1 step= 0.0001 keyIncr=z keyDecr=Z");
+    if (i < 3)
+      param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=-1 max=1 step= 0.0001 keyIncr=z keyDecr=Z");
+    else
+      param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=-1 max=1 step= 0.001 keyIncr=z keyDecr=Z");
   }
 
 }

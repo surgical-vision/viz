@@ -273,7 +273,6 @@ void vizApp::setup(){
 
 void vizApp::updateModels(){
 
-
   if (moveable_camera_){
     if (!moveable_camera_->LoadPose(state.load_one || state.load_all)){
       running_ = false;
@@ -341,7 +340,6 @@ void vizApp::updateVideo(){
 
       cv::resize(left_frame, resized_left, cv::Size(camera_.GetLeftCamera().getImageWidth(), camera_.GetLeftCamera().getImageHeight()));
       cv::resize(right_frame, resized_right, cv::Size(camera_.GetRightCamera().getImageWidth(), camera_.GetRightCamera().getImageHeight()));
-      ci::app::console() << "done 317" << std::endl;
       left_texture_ = fromOcv(resized_left);
       right_texture_ = fromOcv(resized_right);
 
@@ -353,16 +351,12 @@ void vizApp::updateVideo(){
 
 void vizApp::update(){
  
-  ci::app::console() << "entering update" << std::endl;
   if (!running_) return;
 
-  ci::app::console() << "entering update models" << std::endl;
   updateModels();
-  ci::app::console() << "exiting update models" << std::endl;
 
-  ci::app::console() << "entering update video" << std::endl;
   updateVideo();
-  ci::app::console() << "exiting update video" << std::endl;
+
 }
 
 void vizApp::draw2D(gl::Texture &tex){
@@ -419,14 +413,11 @@ void vizApp::draw(){
   
   gl::clear(Color(0, 0, 0));
 
-  if (!running_) return;
-
-  ci::app::console() << "drawing GUI " << std::endl;
-
   /** draw GUI **/
   gui_port.Draw(gui_);
 
-  ci::app::console() << "drawing editor" << std::endl;
+  if (!running_) return;
+
   /** draw editor **/
   if (moveable_camera_){
     editor_port.Draw(moveable_camera_->ParamModifier());
@@ -436,15 +427,11 @@ void vizApp::draw(){
     editor_port.Draw(trackables_[i]->ParamModifier());
   }
 
-  ci::app::console() << "drawing left eye" << std::endl;
-
   /** draw left eye **/
   left_eye.BindAndClear();
   drawLeftEye();
   left_eye.UnBind();
   left_eye.Draw();
-
-  ci::app::console() << "drawing right eye" << std::endl;
 
   /** draw right eye **/
   right_eye.BindAndClear();
@@ -452,22 +439,16 @@ void vizApp::draw(){
   right_eye.UnBind();
   right_eye.Draw();
 
-  ci::app::console() << "drawing scence eye" << std::endl;
-
   /** draw scene **/
   scene_viewer.BindAndClear();
   drawScene(left_texture_, right_texture_);
   scene_viewer.UnBind();
   scene_viewer.Draw();
 
-  ci::app::console() << "drawing trjec eye" << std::endl;
-
   trajectory_viewer.BindAndClear();
   drawCameraTracker();
   trajectory_viewer.UnBind();
   trajectory_viewer.Draw();
-
-  ci::app::console() << "saving stuff" << std::endl;
 
   saveState();
 
