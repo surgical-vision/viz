@@ -135,6 +135,11 @@ void vizApp::setupFromConfig(const std::string &path){
 
   }
   catch (std::runtime_error){
+
+    camera_image_width_ = 720;
+    camera_image_height_ = 576;
+    framebuffer_ = gl::Fbo(camera_image_width_, camera_image_height_);
+
     return;
   }
 
