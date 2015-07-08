@@ -62,7 +62,8 @@ namespace viz {
     gl::Fbo head_framebuffer;
     gl::Fbo clasper1_framebuffer;
     gl::Fbo clasper2_framebuffer;
-
+    gl::Fbo clasper1_base_framebuffer;
+    gl::Fbo clasper2_base_framebuffer;
 
     virtual void setup() override;
     virtual void mouseDown(MouseEvent event) override;

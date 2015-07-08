@@ -277,6 +277,9 @@ void vizApp::setup(){
   clasper1_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
   clasper2_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
 
+  clasper1_base_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
+  clasper2_base_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
+
 }
 
 void vizApp::updateModels(){
@@ -1049,28 +1052,40 @@ void vizApp::draw2DTrack(){
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
 	gl::pushModelView();
-	//gl::multModelView(clasper_left_pose);
-  //gl::drawCoordinateFrame(3, 0.5, 0.1);
-  //gl::drawVector(ci::Vec3f(0, 0, 0), ci::Vec3f(-3, 0, 10));
   lnd->DrawClaspers1();
-  //gl::drawLine(ci::Vec3f(0, 0, 0), ci::Vec3f(0, 0, 5));
 	gl::popModelView();
   clasper1_framebuffer.unbindFramebuffer();
 	glFinish();
+
+  
+  clasper1_base_framebuffer.bindFramebuffer();
+  gl::color(1.0, 1.0, 1.0);
+  gl::clear();
+  gl::pushModelView();
+  gl::multModelView(clasper_left_pose);
+  gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+  gl::popModelView();
+  clasper1_base_framebuffer.unbindFramebuffer();
+  glFinish();
   
   clasper2_framebuffer.bindFramebuffer();
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
 	gl::pushModelView();
-	//gl::multModelView(clasper_right_pose);
   lnd->DrawClaspers2();
-  //gl::drawCoordinateFrame(3,0.5,0.1);
-	//gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
-  //gl::drawLine(ci::Vec3f(0, 0, 0), ci::Vec3f(0, 0, 5));
-  gl::drawVector(ci::Vec3f(0, 0, 0), ci::Vec3f(-3, 0, 10));
 	gl::popModelView();
   clasper2_framebuffer.unbindFramebuffer();
 	glFinish();
+
+  clasper2_base_framebuffer.bindFramebuffer();
+  gl::color(1.0, 1.0, 1.0);
+  gl::clear();
+  gl::pushModelView();
+  gl::multModelView(clasper_right_pose);
+  gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+  gl::popModelView();
+  clasper2_base_framebuffer.unbindFramebuffer();
+  glFinish();
   
 	gl::popMatrices();
 	
@@ -1089,7 +1104,9 @@ void vizApp::draw2DTrack(){
   cv::Mat clasper_right;
   cv::flip(clasper_right_, clasper_right, 0);
 
-
+  cv::Mat clasper_left_base = toOcv(clasper1_base_framebuffer.getTexture());
+  cv::Mat clasper_right_base = toOcv(clasper2_base_framebuffer.getTexture());
+  
   ci::Vec2f center_of_head = GetCOM(head);
   ci::Vec2f start_of_shaft = GetEnd(shaft_axis, false);
   ci::Vec2f instrument_tracked_point = GetEndOfShaft(center_of_head, start_of_shaft);
