@@ -621,3 +621,14 @@ void DHDaVinciPoseGrabber::DrawHead(){
 	model_.DrawHead();
 
 }
+
+void DHDaVinciPoseGrabber::DrawClaspers1(){
+
+  model_.DrawLeftClasper();
+
+}
+void DHDaVinciPoseGrabber::DrawClaspers2(){
+
+  model_.DrawRightClasper();
+
+}

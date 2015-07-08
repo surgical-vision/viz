@@ -83,8 +83,9 @@ namespace viz {
 
   protected:
 
-	void drawSegmentation();
-	void draw2DTrack();
+	  void drawSegmentation();
+	  void draw2DTrack();
+    ci::Vec2i GetEndOfShaft(ci::Vec2f &shaft_start, ci::Vec2f &shaft_end);
 
     SubWindow left_eye;
     SubWindow right_eye;

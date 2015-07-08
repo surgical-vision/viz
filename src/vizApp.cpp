@@ -873,6 +873,31 @@ void vizApp::drawSegmentation(){
 
 }
 
+ci::Vec2f GetEnd(cv::Mat &image, bool IS_PSM_1){
+
+  std::vector<cv::Point> line;
+  for (int r = 0; r < image.rows; ++r){
+    for (int c = 0; c < image.cols; ++c){
+      if (image.at<cv::Vec4b>(r, c)[0] != 0.0){
+        line.push_back(cv::Point(c, r));
+      }
+    }
+  }
+
+  if (line.size() == 0) return ci::Vec2f(-1, -1);
+
+  //sort so that the right most values are first and the left most are last
+  std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
+
+  if (IS_PSM_1){
+    return ci::Vec2f(line.back().x, line.back().y);
+  }
+  else{
+    return ci::Vec2f(line.front().x, line.front().y);
+  }
+
+}
+
 ci::Vec2f GetCenter(cv::Mat &image, bool IS_PSM_1){
 
 	std::vector<cv::Point> line;
@@ -883,6 +908,8 @@ ci::Vec2f GetCenter(cv::Mat &image, bool IS_PSM_1){
 			}
 		}
 	}
+
+  if (line.size() == 0) return ci::Vec2f(-1, -1);
 
 	std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
 
@@ -905,6 +932,8 @@ ci::Vec2f GetVector(cv::Mat &image, bool IS_PSM_1){
 			}
 		}
 	}
+
+  if (line.size() == 0) return ci::Vec2f(0, 0);
 
 	std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
 
@@ -931,8 +960,42 @@ ci::Vec2i GetCOM(cv::Mat &image){
 		}
 	}
 
+  if (count == 0) return ci::Vec2f(-1, -1);
+
 	return ci::Vec2i(com[0] / count, com[1] / count);
 
+
+}
+
+ci::Vec2i vizApp::GetEndOfShaft(ci::Vec2f &shaft_start, ci::Vec2f &shaft_end){
+
+  cv::Mat frame = left_eye.getFrame();
+  cv::Mat ff; cv::flip(frame, ff, 0);
+
+  std::vector<std::pair<cv::Vec4b,cv::Point>> colors;
+
+  for (float d = 0.02; d < 1.0; d += 0.02){
+    ci::Vec2f point = shaft_start + d*(shaft_end - shaft_start);
+
+    cv::Point pt(point[0], point[1]);
+    colors.push_back(std::make_pair(ff.at<cv::Vec4b>(pt), pt));
+
+  }
+
+  float max_diff = std::numeric_limits<float>::min();
+  cv::Point transition_point(-1, -1);
+  for (size_t i = 1; i < colors.size(); ++i){
+
+    float diff = (std::abs(float(colors[i].first[0]) - float(colors[i - 1].first[0])) + std::abs(float(colors[i].first[2]) - float(colors[i - 1].first[2])) + std::abs(float(colors[i].first[2]) - float(colors[i - 1].first[2])))/3;
+
+    if (diff > max_diff){
+      max_diff = diff;
+      transition_point = colors[i].second;
+    }
+
+  }
+
+  return ci::Vec2i(transition_point.x, transition_point.y);
 
 }
 
@@ -940,10 +1003,12 @@ void vizApp::draw2DTrack(){
 
 	//static bool first = true;
 	
-	static std::ofstream ofs("z:/pose_data.txt");
+	//static std::ofstream ofs("z:/pose_data.txt");
 
-  cv::Mat frame = left_eye.getFrame();
-  cv::Mat ff; cv::flip(frame, ff, 0);
+  
+  cv::Mat frame;
+  cv::flip(left_eye.getFrame(), frame, 0);
+  cv::Mat ff = toOcv(left_texture_);
 
 	gl::enableDepthRead();
 	gl::enableDepthWrite();
@@ -960,21 +1025,12 @@ void vizApp::draw2DTrack(){
 	gl::clear();
   gl::color(1.0, 1.0, 1.0);
   ci::Vec3f origin(0, 0, 0);
-	ci::Vec3f shaft_dir(0, 0, 10);
-  ci::Vec3f shaft_dir2(10, 0, 0);
-  ci::Vec3f shaft_dir3(0, 10, 0);
-  ci::Vec3f shaft_dir4(0, 0, -10);
-  ci::Vec3f shaft_dir5(-10, 0, 0);
-  ci::Vec3f shaft_dir6(0, -10, 0); 
+	ci::Vec3f shaft_dir(0, 0, -10);
+ 
   gl::pushModelView();
   ci::gl::multModelView(shaft_pose);
-  gl::drawSphere(origin, 3);
-	gl::drawLine(origin, shaft_dir);
-  gl::drawLine(origin, shaft_dir2);
-  gl::drawLine(origin, shaft_dir3);
-  gl::drawLine(origin, shaft_dir4);
-  gl::drawLine(origin, shaft_dir5);
-  gl::drawLine(origin, shaft_dir6);
+  gl::drawLine(origin, shaft_dir);
+
   gl::popModelView();
   shaft_framebuffer.unbindFramebuffer();
 	glFinish();
@@ -993,8 +1049,11 @@ void vizApp::draw2DTrack(){
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
 	gl::pushModelView();
-	gl::multModelView(clasper_left_pose);
-	gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+	//gl::multModelView(clasper_left_pose);
+  //gl::drawCoordinateFrame(3, 0.5, 0.1);
+  //gl::drawVector(ci::Vec3f(0, 0, 0), ci::Vec3f(-3, 0, 10));
+  lnd->DrawClaspers1();
+  //gl::drawLine(ci::Vec3f(0, 0, 0), ci::Vec3f(0, 0, 5));
 	gl::popModelView();
   clasper1_framebuffer.unbindFramebuffer();
 	glFinish();
@@ -1003,8 +1062,12 @@ void vizApp::draw2DTrack(){
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
 	gl::pushModelView();
-	gl::multModelView(clasper_right_pose);
-	gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+	//gl::multModelView(clasper_right_pose);
+  lnd->DrawClaspers2();
+  //gl::drawCoordinateFrame(3,0.5,0.1);
+	//gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+  //gl::drawLine(ci::Vec3f(0, 0, 0), ci::Vec3f(0, 0, 5));
+  gl::drawVector(ci::Vec3f(0, 0, 0), ci::Vec3f(-3, 0, 10));
 	gl::popModelView();
   clasper2_framebuffer.unbindFramebuffer();
 	glFinish();
@@ -1027,21 +1090,47 @@ void vizApp::draw2DTrack(){
   cv::flip(clasper_right_, clasper_right, 0);
 
 
-	ci::Vec2f axis = GetVector(shaft_axis, true);
-	ci::Vec2f center = GetCenter(shaft_axis, true);
-	ci::Vec2f center_of_head = GetCOM(head);
+  ci::Vec2f center_of_head = GetCOM(head);
+  ci::Vec2f start_of_shaft = GetEnd(shaft_axis, false);
+  ci::Vec2f instrument_tracked_point = GetEndOfShaft(center_of_head, start_of_shaft);
+  
 	ci::Vec2f center_of_l_clasper = GetCOM(clasper_left);
 	ci::Vec2f center_of_r_clasper = GetCOM(clasper_right);
+  //ci::Vec2f center_of_l_clasper = GetEnd(clasper_left, true);
+  //ci::Vec2f center_of_r_clasper = GetEnd(clasper_right, true);
 
-	cv::Mat all_frame = cv::Mat::zeros(shaft_axis.size(),CV_8UC1);
-	cv::line(all_frame, cv::Point(center[0], center[1]), cv::Point(center[0], center[1]) + 500 * cv::Point(axis[0], axis[1]), cv::Scalar(255), 3);
-	cv::circle(all_frame, cv::Point(center[0], center[1]), 8, cv::Scalar(255), 1);
-	cv::line(all_frame, cv::Point(center[0], center[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255), 2);
-	cv::line(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255), 2);
-	cv::line(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255), 2);
+  cv::Mat all_frame = ff.clone();
+
+  static cv::VideoWriter vwriter("c:/users/davinci/Desktop/video.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
+
+  //draw line along the axis of the the instrument
+  if (start_of_shaft != ci::Vec2f(-1,-1) && center_of_head != ci::Vec2f(-1,-1))
+    cv::line(all_frame, cv::Point(start_of_shaft[0], start_of_shaft[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255, 0, 0), 2);
+  
+  //mark the tracked point
+  if (instrument_tracked_point != ci::Vec2f(-1,-1))
+    cv::circle(all_frame, cv::Point(instrument_tracked_point[0], instrument_tracked_point[1]), 8, cv::Scalar(255, 0, 0), 1);
+
+  //mark the center of the head
+  if (center_of_head != ci::Vec2f(-1,-1))
+    cv::circle(all_frame, cv::Point(center_of_head[0], center_of_head[1]), 8, cv::Scalar(255, 0, 0), 1);
+
+  //draw the lines to the end of the claspers and stick circles there.
+  if (center_of_head != ci::Vec2f(-1, -1) && center_of_l_clasper != ci::Vec2f(-1, -1)){
+    cv::line(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255, 0, 0), 2);
+    cv::circle(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), 8, cv::Scalar(0, 0, 255), 1);
+  }
+
+  if (center_of_head != ci::Vec2f(-1, -1) && center_of_r_clasper != ci::Vec2f(-1, -1)){
+    cv::line(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255, 0, 0), 2);
+    cv::circle(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), 8, cv::Scalar(0, 255, 0), 1);
+  }
 
   glEnable(GL_TEXTURE_2D);
 	int p = 3;
+
+  vwriter << all_frame;
+
 }
 
 void vizApp::loadTrackables(const ConfigReader &reader, const std::string &output_dir_this_run){
@@ -1053,6 +1142,7 @@ void vizApp::loadTrackables(const ConfigReader &reader, const std::string &outpu
       std::stringstream s; 
       s << "trackable-" << i;
       loadTrackable(reader.get_element("root-dir") + "/" + reader.get_element(s.str()), output_dir_this_run);
+      break;
 
     }
     catch (std::runtime_error){
