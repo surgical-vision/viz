@@ -156,6 +156,8 @@ namespace viz {
 
     static std::string output_directory; /**< The output directory where the subwindows all dump their content. */
 
+    cv::Mat getFrame() { return ci::toOcv(framebuffer_->getTexture()); }
+
     protected:
 
     ci::Rectf window_coords_; /**< The window coordinates within the main window reference frame. */

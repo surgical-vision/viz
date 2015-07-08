@@ -103,6 +103,12 @@ namespace viz {
   public:
 
     virtual void Draw() const;
+
+	void DrawBody() const;
+	void DrawLeftClasper() const;
+	void DrawRightClasper() const;
+	void DrawHead() const;
+
     virtual void LoadData(const std::string &datafile_path);
 
     virtual std::vector<ci::Matrix44f> GetTransformSet() const;

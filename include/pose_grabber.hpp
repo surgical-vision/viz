@@ -256,6 +256,10 @@ namespace viz {
     */
     std::vector<double> &getBaseOffsets() { return base_offsets_; }
 
+	void DrawBody();
+	void DrawHead();
+	void GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right);
+
   protected:
 
     /**

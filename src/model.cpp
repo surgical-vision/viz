@@ -149,7 +149,7 @@ void DaVinciInstrument::LoadData(const std::string &datafile_path){
 std::vector<ci::Matrix44f> DaVinciInstrument::GetTransformSet() const{
   return std::vector<ci::Matrix44f>({ shaft_.transform_, head_.transform_, clasper1_.transform_, clasper2_.transform_});
 }
-
+ 
 void DaVinciInstrument::SetTransformSet(const std::vector<ci::Matrix44f> &transforms){
   
   assert(transforms.size() == 4);
@@ -157,5 +157,30 @@ void DaVinciInstrument::SetTransformSet(const std::vector<ci::Matrix44f> &transf
   head_.transform_ = transforms[1];
   clasper1_.transform_ = transforms[2];
   clasper2_.transform_ = transforms[3];
+
+}
+
+void DaVinciInstrument::DrawBody() const{
+
+	InternalDraw(shaft_);
+
+}
+
+void DaVinciInstrument::DrawLeftClasper() const{
+
+	InternalDraw(clasper1_);
+
+}
+
+
+void DaVinciInstrument::DrawRightClasper() const{
+
+	InternalDraw(clasper2_);
+
+}
+
+void DaVinciInstrument::DrawHead() const{
+
+	InternalDraw(head_);
 
 }

@@ -58,6 +58,12 @@ namespace viz {
 
   public:
 
+    gl::Fbo shaft_framebuffer;
+    gl::Fbo head_framebuffer;
+    gl::Fbo clasper1_framebuffer;
+    gl::Fbo clasper2_framebuffer;
+
+
     virtual void setup() override;
     virtual void mouseDown(MouseEvent event) override;
     virtual void update() override;
@@ -76,6 +82,9 @@ namespace viz {
     static void AddSubWindow(SubWindow *sbw) { sub_windows_.push_back(sbw); }
 
   protected:
+
+	void drawSegmentation();
+	void draw2DTrack();
 
     SubWindow left_eye;
     SubWindow right_eye;

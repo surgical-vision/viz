@@ -272,7 +272,10 @@ void vizApp::setup(){
    
   setupGUI();
  
-
+  shaft_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
+  head_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
+  clasper1_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
+  clasper2_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
 
 }
 
@@ -454,6 +457,13 @@ void vizApp::draw(){
   drawCameraTracker();
   trajectory_viewer.UnBind();
   trajectory_viewer.Draw();
+
+  ////////////
+
+  drawSegmentation();
+  draw2DTrack();
+
+  ///////////
 
   saveState();
 
@@ -810,6 +820,228 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
 
   camera_.unsetCameras(); //reset the viewport values
 
+}
+
+cv::Mat SetMatFromTexture(const gl::Texture &tex, char val){
+
+	cv::Mat f = toOcv(tex);
+
+	return (f != 1)*val;
+
+}
+
+void vizApp::drawSegmentation(){
+
+	static bool first = true;
+	static gl::Fbo framebuffer(camera_image_width_, camera_image_height_);
+	static cv::VideoWriter cap("z:/segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
+	
+	framebuffer.bindFramebuffer();
+
+	gl::enableDepthRead();
+	gl::enableDepthWrite();
+	gl::pushMatrices();
+
+	camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
+	
+	gl::clear();
+
+	boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
+
+	lnd->DrawBody();
+
+	auto texture = framebuffer.getDepthTexture();
+
+	cv::Mat shaft = SetMatFromTexture(texture, 160);
+
+	gl::clear();
+
+	lnd->DrawHead();
+
+	texture = framebuffer.getDepthTexture();
+
+	cv::Mat head = SetMatFromTexture(texture, 70);
+	
+	gl::popMatrices();
+
+	camera_.unsetCameras(); //reset the viewport values
+
+	framebuffer.unbindFramebuffer();
+
+	cv::Mat combined = shaft + head;
+	cap << combined;
+
+}
+
+ci::Vec2f GetCenter(cv::Mat &image, bool IS_PSM_1){
+
+	std::vector<cv::Point> line;
+	for (int r = 0; r < image.rows; ++r){
+		for (int c = 0; c < image.cols; ++c){
+			if (image.at<cv::Vec4b>(r, c)[0] != 0.0){
+				line.push_back(cv::Point(c, r));
+			}
+		}
+	}
+
+	std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
+
+	if (IS_PSM_1){
+		return ci::Vec2f(line.front().x, line.front().y);
+	}
+	else{
+		return ci::Vec2f(line.back().x, line.back().y);
+	}
+
+}
+
+ci::Vec2f GetVector(cv::Mat &image, bool IS_PSM_1){
+
+	std::vector<cv::Point> line;
+	for (int r = 0; r < image.rows; ++r){
+		for (int c = 0; c < image.cols; ++c){
+			if (image.at<cv::Vec4b>(r, c)[0] != 0.0){
+				line.push_back(cv::Point(c, r));
+			}
+		}
+	}
+
+	std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
+
+	cv::Point v = line.front() - line.back();
+	cv::Vec2f vf((float)v.x / std::sqrt(v.x*v.x + v.y*v.y), (float)v.y / std::sqrt(v.x*v.x + v.y*v.y));
+	
+	if (IS_PSM_1)
+		return ci::Vec2f(vf[0], vf[1]);
+	else
+		return -ci::Vec2f(vf[0], vf[1]);
+
+}
+
+ci::Vec2i GetCOM(cv::Mat &image){
+
+	cv::Vec2f com;
+	size_t count = 0;
+	for (int r = 0; r < image.rows; ++r){
+		for (int c = 0; c < image.cols; ++c){
+			if (image.at<cv::Vec4b>(r, c)[0] != 0.0){
+				com += cv::Vec2f(c, r);
+				count++;
+			}
+		}
+	}
+
+	return ci::Vec2i(com[0] / count, com[1] / count);
+
+
+}
+
+void vizApp::draw2DTrack(){
+
+	//static bool first = true;
+	
+	static std::ofstream ofs("z:/pose_data.txt");
+
+  cv::Mat frame = left_eye.getFrame();
+  cv::Mat ff; cv::flip(frame, ff, 0);
+
+	gl::enableDepthRead();
+	gl::enableDepthWrite();
+	gl::pushMatrices();
+  glDisable(GL_TEXTURE_2D);
+
+	camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
+	boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
+	ci::Matrix44f shaft_pose, head_pose, clasper_left_pose, clasper_right_pose;
+	shaft_pose = lnd->GetPose();
+	lnd->GetModelPose(head_pose, clasper_left_pose, clasper_right_pose);
+
+	shaft_framebuffer.bindFramebuffer();
+	gl::clear();
+  gl::color(1.0, 1.0, 1.0);
+  ci::Vec3f origin(0, 0, 0);
+	ci::Vec3f shaft_dir(0, 0, 10);
+  ci::Vec3f shaft_dir2(10, 0, 0);
+  ci::Vec3f shaft_dir3(0, 10, 0);
+  ci::Vec3f shaft_dir4(0, 0, -10);
+  ci::Vec3f shaft_dir5(-10, 0, 0);
+  ci::Vec3f shaft_dir6(0, -10, 0); 
+  gl::pushModelView();
+  ci::gl::multModelView(shaft_pose);
+  gl::drawSphere(origin, 3);
+	gl::drawLine(origin, shaft_dir);
+  gl::drawLine(origin, shaft_dir2);
+  gl::drawLine(origin, shaft_dir3);
+  gl::drawLine(origin, shaft_dir4);
+  gl::drawLine(origin, shaft_dir5);
+  gl::drawLine(origin, shaft_dir6);
+  gl::popModelView();
+  shaft_framebuffer.unbindFramebuffer();
+	glFinish();
+
+  head_framebuffer.bindFramebuffer();
+	gl::clear();
+  gl::color(1.0, 1.0, 1.0);
+	gl::pushModelView();
+	gl::multModelView(head_pose);
+	gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+  head_framebuffer.unbindFramebuffer();
+	gl::popModelView();
+	glFinish();
+
+  clasper1_framebuffer.bindFramebuffer();
+  gl::color(1.0, 1.0, 1.0);
+  gl::clear();
+	gl::pushModelView();
+	gl::multModelView(clasper_left_pose);
+	gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+	gl::popModelView();
+  clasper1_framebuffer.unbindFramebuffer();
+	glFinish();
+  
+  clasper2_framebuffer.bindFramebuffer();
+  gl::color(1.0, 1.0, 1.0);
+  gl::clear();
+	gl::pushModelView();
+	gl::multModelView(clasper_right_pose);
+	gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+	gl::popModelView();
+  clasper2_framebuffer.unbindFramebuffer();
+	glFinish();
+  
+	gl::popMatrices();
+	
+	camera_.unsetCameras(); //reset the viewport values
+  	
+  cv::Mat shaft_axis_ = toOcv(shaft_framebuffer.getTexture());
+  cv::Mat shaft_axis;
+  cv::flip(shaft_axis_, shaft_axis, 0);
+  cv::Mat head_ = toOcv(head_framebuffer.getTexture());
+  cv::Mat head;
+  cv::flip(head_, head, 0);
+  cv::Mat clasper_left_ = toOcv(clasper1_framebuffer.getTexture());
+  cv::Mat clasper_left;
+  cv::flip(clasper_left_, clasper_left, 0);
+  cv::Mat clasper_right_ = toOcv(clasper2_framebuffer.getTexture());
+  cv::Mat clasper_right;
+  cv::flip(clasper_right_, clasper_right, 0);
+
+
+	ci::Vec2f axis = GetVector(shaft_axis, true);
+	ci::Vec2f center = GetCenter(shaft_axis, true);
+	ci::Vec2f center_of_head = GetCOM(head);
+	ci::Vec2f center_of_l_clasper = GetCOM(clasper_left);
+	ci::Vec2f center_of_r_clasper = GetCOM(clasper_right);
+
+	cv::Mat all_frame = cv::Mat::zeros(shaft_axis.size(),CV_8UC1);
+	cv::line(all_frame, cv::Point(center[0], center[1]), cv::Point(center[0], center[1]) + 500 * cv::Point(axis[0], axis[1]), cv::Scalar(255), 3);
+	cv::circle(all_frame, cv::Point(center[0], center[1]), 8, cv::Scalar(255), 1);
+	cv::line(all_frame, cv::Point(center[0], center[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255), 2);
+	cv::line(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255), 2);
+	cv::line(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255), 2);
+
+  glEnable(GL_TEXTURE_2D);
+	int p = 3;
 }
 
 void vizApp::loadTrackables(const ConfigReader &reader, const std::string &output_dir_this_run){

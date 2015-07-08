@@ -576,3 +576,48 @@ void SE3DaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose) 
   ofs_ << "\n";
 
 }
+
+void DHDaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right){
+	
+	if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
+
+		viz::davinci::PSMData psm;
+
+		for (std::size_t i = 0; i < base_joints_.size(); ++i){
+			psm.sj_joint_angles[i] = base_joints_[i] + base_offsets_[i];
+		}
+
+		for (std::size_t i = 0; i < arm_joints_.size(); ++i){
+			psm.jnt_pos[i] = arm_joints_[i] + arm_offsets_[i];
+		}
+
+		if (target_joint_ == davinci::PSM1)
+			buildKinematicChainPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+		else if (target_joint_ == davinci::PSM2)
+			buildKinematicChainPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+
+		head = model_.Head().transform_;
+		clasper_left = model_.Clasper1().transform_;
+		clasper_right = model_.Clasper2().transform_;
+
+	}
+	else{
+
+		throw std::runtime_error("Error, bad joint type");
+
+	}
+
+}
+
+void DHDaVinciPoseGrabber::DrawBody(){
+
+	model_.DrawBody();
+
+}
+
+
+void DHDaVinciPoseGrabber::DrawHead(){
+
+	model_.DrawHead();
+
+}
