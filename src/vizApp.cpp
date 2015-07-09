@@ -1209,7 +1209,7 @@ void vizApp::draw2DTrack(){
   
   cv::Mat all_frame = ff.clone();
 
-  static cv::VideoWriter vwriter("c:/users/davinci/Desktop/video.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
+  //static cv::VideoWriter vwriter("c:/users/davinci/Desktop/video.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
 
   //draw line along the axis of the the instrument
   if (start_of_shaft != ci::Vec2f(-1,-1) && center_of_head != ci::Vec2f(-1,-1))
@@ -1239,9 +1239,12 @@ void vizApp::draw2DTrack(){
   }
 
   glEnable(GL_TEXTURE_2D);
-	int p = 3;
+	//int p = 3;#
 
-  vwriter << all_frame;
+  std::stringstream to_write;
+  //to_write << instrument_tracked_point[0] << " " << instrument_tracked_point[1] << " " << atan2()
+
+  //vwriter << all_frame;
 
 }
 
