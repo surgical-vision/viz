@@ -182,5 +182,7 @@ void DaVinciInstrument::DrawRightClasper() const{
 void DaVinciInstrument::DrawHead() const{
 
 	InternalDraw(head_);
+  InternalDraw(clasper1_);
+  InternalDraw(clasper2_);
 
 }

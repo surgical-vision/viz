@@ -800,7 +800,7 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
   gl::disableDepthRead();
 
   draw2D(texture);
-  
+
   gl::enableDepthRead();
   gl::enableDepthWrite();
   gl::pushMatrices();
@@ -811,25 +811,118 @@ void vizApp::drawEye(gl::Texture &texture, bool is_left){
   else{
     camera_.setupRightCamera(maya_cam_, getCameraPose());
   }
-  
+
   shader_.bind();
   shader_.uniform("tex0", 0);
 
   drawTargets();
 
   shader_.unbind();
-  
-  gl::popMatrices(); 
+
+  gl::popMatrices();
 
   camera_.unsetCameras(); //reset the viewport values
 
 }
 
-cv::Mat SetMatFromTexture(const gl::Texture &tex, char val){
+cv::Mat SetMatFromTexture(const cv::Mat &tex, char val){
 
-	cv::Mat f = toOcv(tex);
+  return (tex != 1)*val;
 
-	return (f != 1)*val;
+}
+
+cv::Mat CombineShaftAndHead(const cv::Mat &body, const cv::Mat &head, unsigned char val_body, unsigned char val_head){
+
+  cv::Mat combined = cv::Mat::zeros(body.size(), CV_8UC1);
+
+  for (int r = 0; r < body.rows; ++r){
+    for (int c = 0; c < body.cols; ++c){
+
+      float body_depth = body.at<float>(r, c);
+      float head_depth = head.at<float>(r, c);
+
+      if (body_depth == 1 && head_depth == 1) continue;
+
+      if (head_depth != 1){
+        combined.at<unsigned char>(r, c) = val_head;
+      }
+
+      if (body_depth != 1){
+        combined.at<unsigned char>(r, c) = val_body;
+      }
+
+      /*if (body_depth == 1){
+        combined.at<unsigned char>(r, c) = val_head;
+      }
+      else if (head_depth == 1){
+        combined.at<unsigned char>(r, c) = val_body;
+      }
+      else{
+        if (body_depth < head_depth){
+          combined.at<unsigned char>(r, c) = val_body;
+        }
+        else{
+          combined.at<unsigned char>(r, c) = val_head;
+        }
+      }*/
+    }
+  }
+
+  std::vector< std::vector< cv::Point> > shaft_contours;
+  std::vector< std::vector< cv::Point> > head_contours;
+
+  cv::Mat shaft = (combined == val_body) * 255;
+  cv::Mat clasper = (combined == val_head) * 255;
+
+  cv::Mat shaft_edges = cv::Mat::zeros(shaft.size(), CV_8UC1), clasper_edges = cv::Mat::zeros(clasper.size(), CV_8UC1);
+  for (int r = 1; r < shaft.rows - 1; ++r){
+    for (int c = 1; c < shaft.cols - 1; ++c){
+      if (shaft.at<unsigned char>(r, c) == 255){
+        if (shaft.at<unsigned char>(r + 1, c) == 0 || shaft.at<unsigned char>(r - 1, c) == 0 || shaft.at<unsigned char>(r, c + 1) == 0 || shaft.at<unsigned char>(r, c - 1) == 0){
+          shaft_edges.at<unsigned char>(r, c) = 255;
+        }
+      }
+
+      if (clasper.at<unsigned char>(r, c) == 255){
+        if (clasper.at<unsigned char>(r + 1, c) == 0 || clasper.at<unsigned char>(r - 1, c) == 0 || clasper.at<unsigned char>(r, c + 1) == 0 || clasper.at<unsigned char>(r, c - 1) == 0){
+          clasper_edges.at<unsigned char>(r, c) = 255;
+        }
+      }
+
+    }
+  }
+
+  cv::findContours(shaft_edges, shaft_contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+  cv::findContours(shaft_edges, head_contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+
+  std::sort(head_contours.begin(), head_contours.end(), [](const std::vector<cv::Point> &a, const std::vector<cv::Point> &b){
+    return a.size() > b.size();
+  });
+
+  std::vector<cv::Point> &shaft_contour = shaft_contours[0];
+  std::vector<cv::Point> &head_contour = head_contours[0];
+  std::vector<cv::Point> &thing = head_contours[1];
+
+  cv::Mat mask = cv::Mat::zeros(combined.rows + 2, combined.cols + 2, CV_8UC1);
+  std::vector<std::vector<cv::Point> >t;
+  t.push_back(thing);
+  cv::drawContours(mask, t, -1, cv::Scalar(255), CV_FILLED, 8);
+
+  std::vector<cv::Point> to_fill_vals;
+
+  for (int r = 1; r < mask.rows-1; ++r){
+    for (int c = 1; c < mask.cols-1; ++c){
+      if (mask.at<unsigned char>(r, c) == 255){
+        to_fill_vals.push_back(cv::Point(c - 1, r - 1));
+      }
+    }
+  }
+
+  for (const auto &pt : to_fill_vals){
+    combined.at<unsigned char>(pt) = val_body;
+  }
+
+  return combined;
 
 }
 
@@ -837,7 +930,7 @@ void vizApp::drawSegmentation(){
 
 	static bool first = true;
 	static gl::Fbo framebuffer(camera_image_width_, camera_image_height_);
-	static cv::VideoWriter cap("z:/segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
+	static cv::VideoWriter cap("c:/users/max/segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
 	
 	framebuffer.bindFramebuffer();
 
@@ -846,32 +939,23 @@ void vizApp::drawSegmentation(){
 	gl::pushMatrices();
 
 	camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
-	
-	gl::clear();
-
 	boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
 
+  gl::clear();
 	lnd->DrawBody();
-
-	auto texture = framebuffer.getDepthTexture();
-
-	cv::Mat shaft = SetMatFromTexture(texture, 160);
+	cv::Mat body = toOcv(framebuffer.getDepthTexture());
 
 	gl::clear();
+  lnd->DrawHead();
+  cv::Mat head = toOcv(framebuffer.getDepthTexture());
 
-	lnd->DrawHead();
+  cv::Mat combined = CombineShaftAndHead(body, head, 160, 70);
 
-	texture = framebuffer.getDepthTexture();
-
-	cv::Mat head = SetMatFromTexture(texture, 70);
-	
-	gl::popMatrices();
-
-	camera_.unsetCameras(); //reset the viewport values
+  gl::popMatrices();
+  camera_.unsetCameras(); //reset the viewport values
 
 	framebuffer.unbindFramebuffer();
 
-	cv::Mat combined = shaft + head;
 	cap << combined;
 
 }
@@ -1024,20 +1108,20 @@ void vizApp::draw2DTrack(){
 	shaft_pose = lnd->GetPose();
 	lnd->GetModelPose(head_pose, clasper_left_pose, clasper_right_pose);
 
+  //shaft 
 	shaft_framebuffer.bindFramebuffer();
 	gl::clear();
   gl::color(1.0, 1.0, 1.0);
   ci::Vec3f origin(0, 0, 0);
 	ci::Vec3f shaft_dir(0, 0, -10);
- 
   gl::pushModelView();
   ci::gl::multModelView(shaft_pose);
   gl::drawLine(origin, shaft_dir);
-
   gl::popModelView();
   shaft_framebuffer.unbindFramebuffer();
 	glFinish();
 
+  //head
   head_framebuffer.bindFramebuffer();
 	gl::clear();
   gl::color(1.0, 1.0, 1.0);
@@ -1048,16 +1132,18 @@ void vizApp::draw2DTrack(){
 	gl::popModelView();
 	glFinish();
 
+  //clasper 1 center
   clasper1_framebuffer.bindFramebuffer();
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
 	gl::pushModelView();
-  lnd->DrawClaspers1();
+  gl::multModelView(clasper_left_pose);
+  gl::drawLine(ci::Vec3f(0, 0, 0), ci::Vec3f(2.5, 0, 10));
 	gl::popModelView();
   clasper1_framebuffer.unbindFramebuffer();
 	glFinish();
-
   
+  //clasper 1 base
   clasper1_base_framebuffer.bindFramebuffer();
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
@@ -1068,15 +1154,19 @@ void vizApp::draw2DTrack(){
   clasper1_base_framebuffer.unbindFramebuffer();
   glFinish();
   
+  //claserp 2 center
   clasper2_framebuffer.bindFramebuffer();
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
 	gl::pushModelView();
-  lnd->DrawClaspers2();
+  //lnd->DrawClaspers2();
+  gl::multModelView(clasper_right_pose);
+  gl::drawLine(ci::Vec3f(0, 0, 0), ci::Vec3f(-2.5, 0, 10));
 	gl::popModelView();
   clasper2_framebuffer.unbindFramebuffer();
 	glFinish();
 
+  //clasper 2 base
   clasper2_base_framebuffer.bindFramebuffer();
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
@@ -1088,9 +1178,9 @@ void vizApp::draw2DTrack(){
   glFinish();
   
 	gl::popMatrices();
-	
 	camera_.unsetCameras(); //reset the viewport values
   	
+
   cv::Mat shaft_axis_ = toOcv(shaft_framebuffer.getTexture());
   cv::Mat shaft_axis;
   cv::flip(shaft_axis_, shaft_axis, 0);
@@ -1103,19 +1193,20 @@ void vizApp::draw2DTrack(){
   cv::Mat clasper_right_ = toOcv(clasper2_framebuffer.getTexture());
   cv::Mat clasper_right;
   cv::flip(clasper_right_, clasper_right, 0);
+  cv::Mat clasper_left_base_ = toOcv(clasper1_base_framebuffer.getTexture());
+  cv::Mat clasper_right_base_ = toOcv(clasper2_base_framebuffer.getTexture());
+  cv::Mat clasper_left_base, clasper_right_base;
+  cv::flip(clasper_left_base_, clasper_left_base, 0); cv::flip(clasper_right_base_, clasper_right_base, 0);
 
-  cv::Mat clasper_left_base = toOcv(clasper1_base_framebuffer.getTexture());
-  cv::Mat clasper_right_base = toOcv(clasper2_base_framebuffer.getTexture());
-  
   ci::Vec2f center_of_head = GetCOM(head);
   ci::Vec2f start_of_shaft = GetEnd(shaft_axis, false);
   ci::Vec2f instrument_tracked_point = GetEndOfShaft(center_of_head, start_of_shaft);
   
 	ci::Vec2f center_of_l_clasper = GetCOM(clasper_left);
 	ci::Vec2f center_of_r_clasper = GetCOM(clasper_right);
-  //ci::Vec2f center_of_l_clasper = GetEnd(clasper_left, true);
-  //ci::Vec2f center_of_r_clasper = GetEnd(clasper_right, true);
-
+  ci::Vec2f base_of_l_clasper = GetCOM(clasper_left_base);
+  ci::Vec2f base_of_r_clasper = GetCOM(clasper_right_base);
+  
   cv::Mat all_frame = ff.clone();
 
   static cv::VideoWriter vwriter("c:/users/davinci/Desktop/video.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
@@ -1132,14 +1223,18 @@ void vizApp::draw2DTrack(){
   if (center_of_head != ci::Vec2f(-1,-1))
     cv::circle(all_frame, cv::Point(center_of_head[0], center_of_head[1]), 8, cv::Scalar(255, 0, 0), 1);
 
+  if (center_of_head != ci::Vec2f(-1, -1) && base_of_l_clasper != ci::Vec2f(-1,-1)){
+    cv::line(all_frame, cv::Point(center_of_head[0], center_of_head[1]), cv::Point(base_of_l_clasper[0], base_of_l_clasper[1]), cv::Scalar(255, 255, 0), 1);
+  }
+
   //draw the lines to the end of the claspers and stick circles there.
-  if (center_of_head != ci::Vec2f(-1, -1) && center_of_l_clasper != ci::Vec2f(-1, -1)){
-    cv::line(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255, 0, 0), 2);
+  if (base_of_l_clasper != ci::Vec2f(-1, -1) && center_of_l_clasper != ci::Vec2f(-1, -1)){
+    cv::line(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), cv::Point(base_of_l_clasper[0], base_of_l_clasper[1]), cv::Scalar(255, 0, 0), 2);
     cv::circle(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), 8, cv::Scalar(0, 0, 255), 1);
   }
 
-  if (center_of_head != ci::Vec2f(-1, -1) && center_of_r_clasper != ci::Vec2f(-1, -1)){
-    cv::line(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255, 0, 0), 2);
+  if (base_of_r_clasper != ci::Vec2f(-1, -1) && center_of_r_clasper != ci::Vec2f(-1, -1)){
+    cv::line(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), cv::Point(base_of_r_clasper[0], base_of_r_clasper[1]), cv::Scalar(255, 0, 0), 2);
     cv::circle(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), 8, cv::Scalar(0, 255, 0), 1);
   }
 
