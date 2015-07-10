@@ -463,9 +463,10 @@ void vizApp::draw(){
 
   ////////////
 
-  drawSegmentation();
-  draw2DTrack();
-
+  if (state.load_one || state.load_all){
+    drawSegmentation();
+    draw2DTrack();
+  }
   ///////////
 
   saveState();
@@ -867,7 +868,7 @@ cv::Mat CombineShaftAndHead(const cv::Mat &body, const cv::Mat &head, unsigned c
       }*/
     }
   }
-
+  /*
   std::vector< std::vector< cv::Point> > shaft_contours;
   std::vector< std::vector< cv::Point> > head_contours;
 
@@ -920,7 +921,7 @@ cv::Mat CombineShaftAndHead(const cv::Mat &body, const cv::Mat &head, unsigned c
 
   for (const auto &pt : to_fill_vals){
     combined.at<unsigned char>(pt) = val_body;
-  }
+  }*/
 
   return combined;
 
@@ -930,7 +931,7 @@ void vizApp::drawSegmentation(){
 
 	static bool first = true;
 	static gl::Fbo framebuffer(camera_image_width_, camera_image_height_);
-	static cv::VideoWriter cap("c:/users/max/segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
+	static cv::VideoWriter cap("c:/users/max/Desktop/ChallengeDataset/Dataset1/PSM1_Segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
 	
 	framebuffer.bindFramebuffer();
 
@@ -956,7 +957,9 @@ void vizApp::drawSegmentation(){
 
 	framebuffer.unbindFramebuffer();
 
-	cap << combined;
+  cv::Mat combined_flipped;
+  cv::flip(combined, combined_flipped, 0);
+  cap << combined_flipped;
 
 }
 
@@ -1073,12 +1076,16 @@ ci::Vec2i vizApp::GetEndOfShaft(ci::Vec2f &shaft_start, ci::Vec2f &shaft_end){
   cv::Point transition_point(-1, -1);
   for (size_t i = 1; i < colors.size(); ++i){
 
-    float diff = (std::abs(float(colors[i].first[0]) - float(colors[i - 1].first[0])) + std::abs(float(colors[i].first[2]) - float(colors[i - 1].first[2])) + std::abs(float(colors[i].first[2]) - float(colors[i - 1].first[2])))/3;
-
-    if (diff > max_diff){
-      max_diff = diff;
+    if (colors[i].first == cv::Vec4b(0, 0, 0, 255) && colors[i - 1].first == cv::Vec4b(70, 70, 70, 255)){
       transition_point = colors[i].second;
     }
+
+    //float diff = (std::abs(float(colors[i].first[0]) - float(colors[i - 1].first[0])) + std::abs(float(colors[i].first[2]) - float(colors[i - 1].first[2])) + std::abs(float(colors[i].first[2]) - float(colors[i - 1].first[2])))/3;
+
+    //if (diff > max_diff){
+    //  max_diff = diff;
+    //  transition_point = colors[i].second;
+    //}
 
   }
 
@@ -1090,12 +1097,11 @@ void vizApp::draw2DTrack(){
 
 	//static bool first = true;
 	
-	//static std::ofstream ofs("z:/pose_data.txt");
-
-  
+	static std::ofstream ofs("C:/Users/max/Desktop/ChallengeDataset/Dataset1/PSM1_Pose.txt");
+    
   cv::Mat frame;
   cv::flip(left_eye.getFrame(), frame, 0);
-  cv::Mat ff = toOcv(left_texture_);
+  cv::Mat camera_image = toOcv(left_texture_);
 
 	gl::enableDepthRead();
 	gl::enableDepthWrite();
@@ -1199,7 +1205,7 @@ void vizApp::draw2DTrack(){
   cv::flip(clasper_left_base_, clasper_left_base, 0); cv::flip(clasper_right_base_, clasper_right_base, 0);
 
   ci::Vec2f center_of_head = GetCOM(head);
-  ci::Vec2f start_of_shaft = GetEnd(shaft_axis, false);
+  ci::Vec2f start_of_shaft = GetEnd(shaft_axis, true);
   ci::Vec2f instrument_tracked_point = GetEndOfShaft(center_of_head, start_of_shaft);
   
 	ci::Vec2f center_of_l_clasper = GetCOM(clasper_left);
@@ -1207,44 +1213,84 @@ void vizApp::draw2DTrack(){
   ci::Vec2f base_of_l_clasper = GetCOM(clasper_left_base);
   ci::Vec2f base_of_r_clasper = GetCOM(clasper_right_base);
   
-  cv::Mat all_frame = ff.clone();
+  cv::Mat all_frame = camera_image.clone();
 
-  //static cv::VideoWriter vwriter("c:/users/davinci/Desktop/video.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
 
   //draw line along the axis of the the instrument
-  if (start_of_shaft != ci::Vec2f(-1,-1) && center_of_head != ci::Vec2f(-1,-1))
-    cv::line(all_frame, cv::Point(start_of_shaft[0], start_of_shaft[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255, 0, 0), 2);
+  ci::Vec2f unit_vector_along_shaft(-1, -1);
+  if (start_of_shaft != ci::Vec2f(-1, -1) && center_of_head != ci::Vec2f(-1, -1)){
+    cv::line(all_frame, cv::Point(start_of_shaft[0], start_of_shaft[1]), cv::Point(instrument_tracked_point[0], instrument_tracked_point[1]), cv::Scalar(255, 0, 0), 2);
+    unit_vector_along_shaft = instrument_tracked_point - start_of_shaft;
+    unit_vector_along_shaft.normalize();
+  }
   
   //mark the tracked point
-  if (instrument_tracked_point != ci::Vec2f(-1,-1))
+  if (instrument_tracked_point != ci::Vec2f(-1, -1)){
     cv::circle(all_frame, cv::Point(instrument_tracked_point[0], instrument_tracked_point[1]), 8, cv::Scalar(255, 0, 0), 1);
+  }
 
   //mark the center of the head
-  if (center_of_head != ci::Vec2f(-1,-1))
+  if (center_of_head != ci::Vec2f(-1, -1) && instrument_tracked_point != ci::Vec2f(-1,-1)){
     cv::circle(all_frame, cv::Point(center_of_head[0], center_of_head[1]), 8, cv::Scalar(255, 0, 0), 1);
+    cv::line(all_frame, cv::Point(instrument_tracked_point[0], instrument_tracked_point[1]), cv::Point(center_of_head[0], center_of_head[1]), cv::Scalar(255, 0, 0) );
+  }
 
   if (center_of_head != ci::Vec2f(-1, -1) && base_of_l_clasper != ci::Vec2f(-1,-1)){
     cv::line(all_frame, cv::Point(center_of_head[0], center_of_head[1]), cv::Point(base_of_l_clasper[0], base_of_l_clasper[1]), cv::Scalar(255, 255, 0), 1);
   }
 
+  ci::Vec2f unit_vector_to_clasper(-1, -1);
   //draw the lines to the end of the claspers and stick circles there.
   if (base_of_l_clasper != ci::Vec2f(-1, -1) && center_of_l_clasper != ci::Vec2f(-1, -1)){
     cv::line(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), cv::Point(base_of_l_clasper[0], base_of_l_clasper[1]), cv::Scalar(255, 0, 0), 2);
     cv::circle(all_frame, cv::Point(center_of_l_clasper[0], center_of_l_clasper[1]), 8, cv::Scalar(0, 0, 255), 1);
+    unit_vector_to_clasper = base_of_l_clasper - center_of_head;
+    unit_vector_to_clasper.normalize();
   }
 
   if (base_of_r_clasper != ci::Vec2f(-1, -1) && center_of_r_clasper != ci::Vec2f(-1, -1)){
     cv::line(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), cv::Point(base_of_r_clasper[0], base_of_r_clasper[1]), cv::Scalar(255, 0, 0), 2);
-    cv::circle(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), 8, cv::Scalar(0, 255, 0), 1);
+    cv::circle(all_frame, cv::Point(center_of_r_clasper[0], center_of_r_clasper[1]), 8, cv::Scalar(0, 255, 0), 1);  
+
+  }
+
+  float angle_between_clasper = -1;
+  if (base_of_r_clasper != ci::Vec2f(-1, -1) && center_of_r_clasper != ci::Vec2f(-1, -1) && base_of_l_clasper != ci::Vec2f(-1, -1) && center_of_l_clasper != ci::Vec2f(-1, -1)){
+    ci::Vec2f a_normed = center_of_r_clasper - base_of_r_clasper;
+    ci::Vec2f b_normed = center_of_l_clasper - base_of_l_clasper;
+    a_normed.normalize(); b_normed.normalize();
+    angle_between_clasper = acos(a_normed[0] * b_normed[0] + a_normed[1] * b_normed[1]) * 180 / 3.141592 ;
+    angle_between_clasper -= 5;
+    if (angle_between_clasper < 0) angle_between_clasper = 0;
   }
 
   glEnable(GL_TEXTURE_2D);
-	//int p = 3;#
 
   std::stringstream to_write;
-  //to_write << instrument_tracked_point[0] << " " << instrument_tracked_point[1] << " " << atan2()
 
-  //vwriter << all_frame;
+  //write the tracked point
+  //the unit vector pointing along the axis
+
+  to_write << instrument_tracked_point[0] << " " << instrument_tracked_point[1] << " " << unit_vector_along_shaft[0] << " " << unit_vector_along_shaft[1];
+  to_write << unit_vector_to_clasper[0] << " " << unit_vector_to_clasper[1] << " " << angle_between_clasper;
+
+  cv::Mat TEST_OUTPUT = camera_image.clone();
+  cv::circle(TEST_OUTPUT, cv::Point(instrument_tracked_point[0], instrument_tracked_point[1]), 10, cv::Scalar(0, 0, 255));
+  cv::line(TEST_OUTPUT, cv::Point(instrument_tracked_point[0], instrument_tracked_point[1]), cv::Point2f(instrument_tracked_point[0], instrument_tracked_point[1]) + 40 * cv::Point2f(unit_vector_along_shaft[0], unit_vector_along_shaft[1]), cv::Scalar(255, 0, 0), 1);
+  
+  cv::Point a = cv::Point(center_of_head[0], center_of_head[1]);
+  cv::Point2f b = cv::Point2f(center_of_head[0], center_of_head[1]) + (40 * cv::Point2f(unit_vector_to_clasper[0], unit_vector_to_clasper[1]));
+  cv::line(TEST_OUTPUT, a, b, cv::Scalar(0, 255, 0));
+
+  std::stringstream ss;
+  ss << angle_between_clasper;
+  cv::putText(TEST_OUTPUT, ss.str(), cv::Point(center_of_head[0], center_of_head[1]) + 20 * cv::Point(unit_vector_to_clasper[0], unit_vector_to_clasper[1]), CV_FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 0, 0));
+  
+  static cv::VideoWriter vwriter("c:/users/max/Desktop/ChallengeDataset/Dataset1/PSM1.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
+  vwriter << TEST_OUTPUT;
+
+  ofs << to_write.str() << "\n";
+  ofs.flush();
 
 }
 
