@@ -29,6 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using namespace viz;
 
+const std::string DATASET_TARGET("/Dataset4/");
+
 std::vector<SubWindow *> vizApp::sub_windows_ = std::vector<SubWindow *>();
 
 void vizApp::setupFromConfig(const std::string &path){
@@ -931,7 +933,7 @@ void vizApp::drawSegmentation(){
 
 	static bool first = true;
 	static gl::Fbo framebuffer(camera_image_width_, camera_image_height_);
-	static cv::VideoWriter cap("c:/users/max/Desktop/ChallengeDataset/Dataset1/PSM1_Segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
+	static cv::VideoWriter cap("c:/users/davinci/Desktop/ChallengeDataset/" + DATASET_TARGET + "/PSM1_Segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
 	
 	framebuffer.bindFramebuffer();
 
@@ -980,10 +982,13 @@ ci::Vec2f GetEnd(cv::Mat &image, bool IS_PSM_1){
   std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
 
   if (IS_PSM_1){
-    return ci::Vec2f(line.back().x, line.back().y);
+    //return ci::Vec2f(line.back().x, line.back().y);
+    return ci::Vec2f(line.front().x, line.front().y);
+
   }
   else{
-    return ci::Vec2f(line.front().x, line.front().y);
+    //return ci::Vec2f(line.front().x, line.front().y);
+    return ci::Vec2f(line.back().x, line.back().y);
   }
 
 }
@@ -1076,7 +1081,11 @@ ci::Vec2i vizApp::GetEndOfShaft(ci::Vec2f &shaft_start, ci::Vec2f &shaft_end){
   cv::Point transition_point(-1, -1);
   for (size_t i = 1; i < colors.size(); ++i){
 
-    if (colors[i].first == cv::Vec4b(0, 0, 0, 255) && colors[i - 1].first == cv::Vec4b(70, 70, 70, 255)){
+    if (colors[i].first == cv::Vec4b(0, 0, 0, 255) && colors[i - 1].first != cv::Vec4b(0, 0, 0, 255) ){
+      transition_point = colors[i].second;
+    }
+
+    else if (colors[i-1].first == cv::Vec4b(0, 0, 0, 255) && colors[i].first != cv::Vec4b(0, 0, 0, 255)){
       transition_point = colors[i].second;
     }
 
@@ -1097,7 +1106,7 @@ void vizApp::draw2DTrack(){
 
 	//static bool first = true;
 	
-	static std::ofstream ofs("C:/Users/max/Desktop/ChallengeDataset/Dataset1/PSM1_Pose.txt");
+	static std::ofstream ofs("C:/Users/davinci/Desktop/ChallengeDataset/" + DATASET_TARGET + "/PSM1_Pose.txt");
     
   cv::Mat frame;
   cv::flip(left_eye.getFrame(), frame, 0);
@@ -1119,7 +1128,7 @@ void vizApp::draw2DTrack(){
 	gl::clear();
   gl::color(1.0, 1.0, 1.0);
   ci::Vec3f origin(0, 0, 0);
-	ci::Vec3f shaft_dir(0, 0, -10);
+	ci::Vec3f shaft_dir(0, 0, -25);
   gl::pushModelView();
   ci::gl::multModelView(shaft_pose);
   gl::drawLine(origin, shaft_dir);
@@ -1259,9 +1268,16 @@ void vizApp::draw2DTrack(){
     ci::Vec2f a_normed = center_of_r_clasper - base_of_r_clasper;
     ci::Vec2f b_normed = center_of_l_clasper - base_of_l_clasper;
     a_normed.normalize(); b_normed.normalize();
-    angle_between_clasper = acos(a_normed[0] * b_normed[0] + a_normed[1] * b_normed[1]) * 180 / 3.141592 ;
-    angle_between_clasper -= 5;
-    if (angle_between_clasper < 0) angle_between_clasper = 0;
+
+    float dot = a_normed[0] * b_normed[0] + a_normed[1] * b_normed[1];
+    if (dot > 1 || dot < -1){
+      angle_between_clasper = 0;
+    }
+    else{
+      angle_between_clasper = acos(dot) * 180 / 3.141592;
+      angle_between_clasper -= 5;
+      if (angle_between_clasper < 0) angle_between_clasper = 0;
+    }
   }
 
   glEnable(GL_TEXTURE_2D);
@@ -1271,7 +1287,7 @@ void vizApp::draw2DTrack(){
   //write the tracked point
   //the unit vector pointing along the axis
 
-  to_write << instrument_tracked_point[0] << " " << instrument_tracked_point[1] << " " << unit_vector_along_shaft[0] << " " << unit_vector_along_shaft[1];
+  to_write << instrument_tracked_point[0] << " " << instrument_tracked_point[1] << " " << unit_vector_along_shaft[0] << " " << unit_vector_along_shaft[1] << " ";
   to_write << unit_vector_to_clasper[0] << " " << unit_vector_to_clasper[1] << " " << angle_between_clasper;
 
   cv::Mat TEST_OUTPUT = camera_image.clone();
@@ -1286,7 +1302,7 @@ void vizApp::draw2DTrack(){
   ss << angle_between_clasper;
   cv::putText(TEST_OUTPUT, ss.str(), cv::Point(center_of_head[0], center_of_head[1]) + 20 * cv::Point(unit_vector_to_clasper[0], unit_vector_to_clasper[1]), CV_FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 0, 0));
   
-  static cv::VideoWriter vwriter("c:/users/max/Desktop/ChallengeDataset/Dataset1/PSM1.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
+  static cv::VideoWriter vwriter("c:/users/davinci/Desktop/ChallengeDataset/" + DATASET_TARGET + "/PSM1.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
   vwriter << TEST_OUTPUT;
 
   ofs << to_write.str() << "\n";

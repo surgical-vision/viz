@@ -32,14 +32,15 @@ set( SOURCES camera.cpp davinci.cpp pose_grabber.cpp video.cpp vizApp.cpp model.
 list(APPEND LIB_INC_DIR  "${PROJECT_SOURCE_DIR}/include;${CMAKE_CURRENT_BINARY_DIR}/include" )
 
 #Boost
-set(Boost_USE_STATIC_LIBS OFF) # only find static libs
-set(Boost_USE_MULTITHREADED ON)
+set(Boost_USE_STATIC_LIBS ON) 
+set(Boost_USE_MULTITHREADED ON)  
 set(Boost_USE_STATIC_RUNTIME OFF)
-set(BOOST_ALL_DYN_LINK ON)
-find_package(Boost REQUIRED QUIET)
-list(APPEND USER_INC  "${Boost_INCLUDE_DIRS}" )
-list(APPEND LINK_LIBS "${Boost_LIBRARIES}" )
-list(APPEND USER_LIB "${Boost_LIBRARY_DIR}" )
+#set(Boost_BOOST_ALL_DYN_LINK)
+find_package(Boost REQUIRED COMPONENTS regex chrono date_time system filesystem thread)
+if(Boost_FOUND)
+    list(APPEND USER_INC "${Boost_INCLUDE_DIRS}")
+    list(APPEND LINK_LIBS "${Boost_LIBRARIES}")
+endif()
 
 find_package(OpenCV REQUIRED)
 list(APPEND USER_INC "${OpenCV_INCLUDE_DIRS}" )
