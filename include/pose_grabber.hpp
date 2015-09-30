@@ -75,6 +75,8 @@ namespace viz {
 
     virtual void WritePoseToStream(const ci::Matrix44f &camera_pose) = 0;
     
+    std::string WriteSE3ToString(const ci::Matrix44f &mat);
+
     /**
     * Renders the model to the currently bound framebuffer. Assumes OpenGL context is available on current thread.
     */
@@ -154,6 +156,8 @@ namespace viz {
     */
     virtual void Draw() const { model_.Draw(); }
 
+    virtual ~PoseGrabber() { if (ifs_.is_open()) ifs_.close(); if (ofs_.is_open()) ofs_.close(); }
+
   protected:
     
     std::ifstream ifs_; /**< The file stream containing the SE3 transforms for each frame. */
@@ -219,6 +223,22 @@ namespace viz {
 
   public:
 
+    void SetOffsetsToNull() {
+
+      for (size_t i = 0; i < base_offsets_.size(); ++i){
+
+        base_offsets_[i] = 0;
+
+      }
+
+      for (size_t i = 0; i < arm_offsets_.size(); ++i){
+
+        arm_offsets_[i] = 0;
+
+      }
+
+    }
+
     /**
     * Construct a DH parameter da Vinci manipulator from a configuration file.
     * @param[in] reader A ConfigReader instance which has been initialized from a config file.
@@ -255,6 +275,8 @@ namespace viz {
     * @return The offsets vector for the base arm (setup joints) so these can be update from the UI.
     */
     std::vector<double> &getBaseOffsets() { return base_offsets_; }
+
+    virtual ~DHDaVinciPoseGrabber() { if (base_ifs_.is_open()) base_ifs_.close(); if (arm_ifs_.is_open()) arm_ifs_.close(); if (base_ofs_.is_open()) base_ofs_.close(); if (arm_ofs_.is_open()) arm_ofs_.close(); if (se3_ofs_.is_open()) se3_ofs_.close(); }
 
 	void DrawBody();
 	void DrawHead();
@@ -333,6 +355,13 @@ namespace viz {
     * @return Return the current pose estimate.
     */
     virtual ci::Matrix44f GetPose() { return shaft_pose_; }
+
+    ~SE3DaVinciPoseGrabber() { if (ifs_.is_open()) ifs_.close(); if (ofs_.is_open()) ofs_.close(); }
+
+    void DrawBody();
+    void DrawHead();
+    void GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right);
+
 
   protected:
 

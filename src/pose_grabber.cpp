@@ -34,6 +34,24 @@ inline void clean_string(std::string &str, const std::vector<char> &to_remove){
 
 size_t BasePoseGrabber::grabber_num_id_ = 0;
 
+
+std::string BasePoseGrabber::WriteSE3ToString(const ci::Matrix44f &mat){
+
+  std::stringstream ss;
+
+  for (int r = 0; r < 4; ++r){
+    ss << "| ";
+    for (int c = 0; c < 4; ++c){
+      ss << mat.at(r, c) << " ";
+    }
+    ss << "|\n";
+  }
+
+  return ss.str();
+
+}
+
+
 BasePoseGrabber::BasePoseGrabber(const std::string &output_dir) : do_draw_(false) , save_dir_(output_dir) {
 
   std::stringstream ss;
@@ -269,7 +287,7 @@ void DHDaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const s
     ss >> base_offsets_[i];
     std::stringstream ss;
     ss << "SU Joint " << i;
-    param_modifier_->addParam(ss.str(), &(base_offsets_[i]), "min=-1 max=1 step= 0.0001 keyIncr=z keyDecr=Z");
+    param_modifier_->addParam(ss.str(), &(base_offsets_[i]), "min=-10 max=10 step= 0.0001 keyIncr=z keyDecr=Z");
   }
 
   param_modifier_->addSeparator();
@@ -282,9 +300,9 @@ void DHDaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const s
     std::stringstream ss;
     ss << "Joint " << i;
     if (i < 3)
-      param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=-1 max=1 step= 0.0001 keyIncr=z keyDecr=Z");
+      param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=-10 max=10 step= 0.0001 keyIncr=z keyDecr=Z");
     else
-      param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=-1 max=1 step= 0.001 keyIncr=z keyDecr=Z");
+      param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=-10 max=10 step= 0.001 keyIncr=z keyDecr=Z");
   }
 
 }
@@ -325,6 +343,18 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
       buildKinematicChainPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
     else if (target_joint_ == davinci::PSM2)
       buildKinematicChainPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+
+    //ci::app::console() << "Current setup joint values: ";
+    //for (std::size_t i = 0; i < base_joints_.size(); ++i){
+    //  ci::app::console() << psm.sj_joint_angles[i] << " ";
+    //}
+    //ci::app::console() << std::endl
+
+    //ci::app::console() << "Current joint values: ";
+    //for (std::size_t i = 0; i < arm_joints_.size(); ++i){
+    //  ci::app::console() << psm.jnt_pos[i] << " ";
+    //}
+    //ci::app::console() << std::endl;
 
     return model_.Shaft().transform_;
 
@@ -398,22 +428,21 @@ void DHDaVinciPoseGrabber::WritePoseToStream()  {
   if (!arm_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
   if (!base_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
 
-
-  se3_ofs_ << model_.Shaft().transform_ << "\n";
+  se3_ofs_ << WriteSE3ToString(model_.Shaft().transform_) << "\n";
   for (size_t i = 4; i < arm_joints_.size(); ++i){
     se3_ofs_ << arm_joints_[i] + arm_offsets_[i] << "\n";
   }
-  se3_ofs_ << "\n";
+  se3_ofs_ << std::endl;
 
   for (size_t i = 0; i < arm_joints_.size(); ++i){
     arm_ofs_ << arm_joints_[i] + arm_offsets_[i] << " ";
   }
-  arm_ofs_ << "\n";
+  arm_ofs_ << std::endl;
 
   for (size_t i = 0; i < base_joints_.size(); ++i){
     base_ofs_ << base_joints_[i] + base_offsets_[i] << " ";
   }
-  base_ofs_ << "\n";
+  base_ofs_ << std::endl;
 
 }
 
@@ -432,21 +461,21 @@ void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  
   if (!arm_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
   if (!base_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
 
-  se3_ofs_ << camera_pose.inverted() * model_.Shaft().transform_ << "\n";
+  se3_ofs_ << WriteSE3ToString(camera_pose.inverted() * model_.Shaft().transform_) << "\n";
   for (size_t i = 4; i < arm_joints_.size(); ++i){
     se3_ofs_ << arm_joints_[i] + arm_offsets_[i] << "\n";
   }
-  se3_ofs_ << "\n";
+  se3_ofs_ << std::endl;
 
   for (size_t i = 0; i < arm_joints_.size(); ++i){
     arm_ofs_ << arm_joints_[i] + arm_offsets_[i] << " ";
   }
-  arm_ofs_ << "\n";
+  arm_ofs_ << std::endl;
 
   for (size_t i = 0; i < base_joints_.size(); ++i){
     base_ofs_ << base_joints_[i] + base_offsets_[i] << " ";
   }
-  base_ofs_ << "\n";
+  base_ofs_ << std::endl;
 
 }
 
@@ -515,14 +544,14 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
       reference_frame_tracks_.push_back(shaft_pose_);
 
     }
-    catch (std::ofstream::failure e){
+    catch (std::ifstream::failure e){
       shaft_pose_.setToIdentity();
       do_draw_ = false;
       return false;
     }
 
   }
-  if (do_draw_ == false) return false;
+  //if (do_draw_ == false) return false;
 
   model_.Shaft().transform_ = shaft_pose_;
 
@@ -551,7 +580,8 @@ void SE3DaVinciPoseGrabber::WritePoseToStream() {
 
   if (!ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
 
-  ofs_ << model_.Shaft().transform_ << "\n";
+  ofs_ << WriteSE3ToString(model_.Shaft().transform_) << "\n";
+  
   for (size_t i = 0; i < wrist_dh_params_.size(); ++i){
     ofs_ << wrist_dh_params_[i] << "\n";
   }
@@ -569,12 +599,12 @@ void SE3DaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose) 
 
   if (!ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
 
-  ofs_ << camera_pose.inverted() * model_.Shaft().transform_ << "\n";
+  ofs_ << WriteSE3ToString(camera_pose.inverted() * model_.Shaft().transform_) << "\n";
   for (size_t i = 0; i < wrist_dh_params_.size(); ++i){
     ofs_ << wrist_dh_params_[i] << "\n";
   }
   ofs_ << "\n";
-
+  
 }
 
 void DHDaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right){
@@ -583,7 +613,7 @@ void DHDaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clas
 
 		viz::davinci::PSMData psm;
 
-		for (std::size_t i = 0; i < base_joints_.size(); ++i){
+    for (std::size_t i = 0; i < base_joints_.size(); ++i){
 			psm.sj_joint_angles[i] = base_joints_[i] + base_offsets_[i];
 		}
 
@@ -609,6 +639,54 @@ void DHDaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clas
 
 }
 
+
+void SE3DaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right){
+
+  if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
+  
+    model_.Shaft().transform_ = shaft_pose_;
+
+    viz::davinci::PSMData psm;
+    for (size_t i = 0; i < num_wrist_joints_; ++i){
+      psm.jnt_pos[i] = wrist_dh_params_[i];
+    }
+
+
+    if (target_joint_ == davinci::PSM1)
+      buildKinematicChainPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+    else if (target_joint_ == davinci::PSM2)
+      buildKinematicChainPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+
+    head = model_.Head().transform_;
+    clasper_left = model_.Clasper1().transform_;
+    clasper_right = model_.Clasper2().transform_;
+
+  }
+  else{
+
+    throw std::runtime_error("Error, bad joint type");
+
+  }
+
+}
+
+
+
+void SE3DaVinciPoseGrabber::DrawBody(){
+
+  model_.DrawBody();
+
+}
+
+
+void SE3DaVinciPoseGrabber::DrawHead(){
+
+  model_.DrawHead();
+  model_.DrawLeftClasper();
+  model_.DrawRightClasper();
+
+}
+
 void DHDaVinciPoseGrabber::DrawBody(){
 
 	model_.DrawBody();
@@ -619,5 +697,7 @@ void DHDaVinciPoseGrabber::DrawBody(){
 void DHDaVinciPoseGrabber::DrawHead(){
 
 	model_.DrawHead();
+  model_.DrawLeftClasper();
+  model_.DrawRightClasper();
 
 }

@@ -44,7 +44,7 @@ namespace viz {
     /**
     * Empty constructor.
     */
-    SubWindow() : can_save_(false) { }
+    SubWindow() : can_save_(false), frame_count_(0), file_count_(0) { }
 
     /**
     * Create a window with dimensions.
@@ -122,8 +122,9 @@ namespace viz {
 
     /**
     * Initialise the window for saving. This process opens a file handle to an avi file using the OpenCV VideoWriter interface.
+    * @param[in] vid_file_idx An index to split the file up if it gets too large.
     */
-    void InitSavingWindow();
+    void InitSavingWindow(const size_t vid_file_idx = 0);
 
     /**
     * Close the currently open video file (if applicable).
@@ -159,6 +160,9 @@ namespace viz {
     cv::Mat getFrame() { return ci::toOcv(framebuffer_->getTexture()); }
 
     protected:
+
+    size_t frame_count_;
+    size_t file_count_;
 
     ci::Rectf window_coords_; /**< The window coordinates within the main window reference frame. */
     boost::shared_ptr<ci::gl::Fbo> framebuffer_; /**< The framebuffer of size width, height which is rendered to when we draw to this subwindow. */

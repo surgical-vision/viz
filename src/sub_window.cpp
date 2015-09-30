@@ -36,6 +36,9 @@ void SubWindow::Init(const std::string &name, int start_x, int start_y, int eye_
   name_ = name; 
   can_save_ = can_save;
 
+  frame_count_ = 0;
+  file_count_ = 0;
+
   window_coords_ = ci::Rectf(start_x, start_y, start_x + draw_width, start_y + draw_height);
   ci::gl::Fbo::Format f;
   f.enableMipmapping();
@@ -45,7 +48,7 @@ void SubWindow::Init(const std::string &name, int start_x, int start_y, int eye_
 
   if (can_save_){
     save_params_ = ci::params::InterfaceGl::create(ci::app::getWindow(), "Save Window", ci::app::toPixels(ci::Vec2i(100, 100)));
-    save_params_->addButton("Save contents to file", std::bind(&SubWindow::InitSavingWindow, this));
+    save_params_->addButton("Save contents to file", std::bind(&SubWindow::InitSavingWindow, this, 0));
     save_params_->show();
   }
 
@@ -86,6 +89,18 @@ bool SubWindow::IsSaving() const {
 void SubWindow::WriteFrameToFile(){
 
   cv::Mat window = toOcv(framebuffer_->getTexture());
+  
+  cv::Mat flipped_window;
+  cv::flip(window, flipped_window, 0);
+
+  if (frame_count_ == 2000){
+    file_count_++;
+    frame_count_ = 0;
+    CloseStream();
+    InitSavingWindow(file_count_);
+  }
+    
+  frame_count_++;
   writer_.write(window);
 
 }
@@ -132,7 +147,7 @@ void SubWindow::CloseStream(){
   
 }
 
-void SubWindow::InitSavingWindow(){
+void SubWindow::InitSavingWindow(const size_t vid_file_idx){
 
   std::string &save_dir = output_directory;
   if (!boost::filesystem::exists(save_dir)) {
@@ -141,8 +156,9 @@ void SubWindow::InitSavingWindow(){
 
   std::string name = name_;
   std::replace(name.begin(), name.end(), ' ', '_');
-  std::string filepath = save_dir + "/" + name + ".avi";
+  std::stringstream filepath;
+  filepath << save_dir + "/" + name + "_" << vid_file_idx << ".avi";
 
-  writer_.open(filepath, CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(texture_.getWidth(), texture_.getHeight()));
+  writer_.open(filepath.str(), CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(texture_.getWidth(), texture_.getHeight()));
 
 }

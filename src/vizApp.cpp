@@ -277,6 +277,8 @@ void vizApp::setup(){
   clasper1_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
   clasper2_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
 
+  ci::app::setFrameRate(90);
+
 }
 
 void vizApp::updateModels(){
@@ -353,6 +355,7 @@ void vizApp::updateVideo(){
 
     }
 
+
   }
 
 }
@@ -360,6 +363,11 @@ void vizApp::updateVideo(){
 void vizApp::update(){
  
   if (!running_) return;
+
+  static bool first = true;
+  if (!first)
+    saveState();
+  first = false;
 
   updateModels();
 
@@ -465,7 +473,7 @@ void vizApp::draw(){
 
   ///////////
 
-  saveState();
+  //saveState();
 
   state.load_one = false;
   state.save_one = false;
@@ -826,7 +834,21 @@ cv::Mat SetMatFromTexture(const gl::Texture &tex, char val){
 
 	cv::Mat f = toOcv(tex);
 
-	return (f != 1)*val;
+  cv::Mat bo = cv::Mat::zeros(f.size(), CV_8UC1);
+  for (int r = 0; r < f.rows; ++r){
+    for (int c = 0; c < f.cols; ++c){
+      bo.at<unsigned char>(r, c) = f.at<float>(r, c) != 1.0f;
+    }
+  }
+
+  for (int r = 0; r < f.rows; ++r){
+    for (int c = 0; c < f.cols; ++c){
+      bo.at<unsigned char>(r, c) *= val;
+    }
+  }
+
+  return bo;
+	//return (f != 1.0)*val;
 
 }
 
@@ -834,7 +856,7 @@ void vizApp::drawSegmentation(){
 
 	static bool first = true;
 	static gl::Fbo framebuffer(camera_image_width_, camera_image_height_);
-	static cv::VideoWriter cap("z:/segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
+	static cv::VideoWriter cap("segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
 	
 	framebuffer.bindFramebuffer();
 
@@ -846,13 +868,13 @@ void vizApp::drawSegmentation(){
 	
 	gl::clear();
 
-	boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
+  boost::shared_ptr<SE3DaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<SE3DaVinciPoseGrabber>(trackables_[0]);
 
 	lnd->DrawBody();
 
 	auto texture = framebuffer.getDepthTexture();
 
-	cv::Mat shaft = SetMatFromTexture(texture, 160);
+	cv::Mat shaft = SetMatFromTexture(texture, 255);
 
 	gl::clear();
 
@@ -860,7 +882,7 @@ void vizApp::drawSegmentation(){
 
 	texture = framebuffer.getDepthTexture();
 
-	cv::Mat head = SetMatFromTexture(texture, 70);
+	cv::Mat head = SetMatFromTexture(texture, 255);
 	
 	gl::popMatrices();
 
@@ -869,6 +891,7 @@ void vizApp::drawSegmentation(){
 	framebuffer.unbindFramebuffer();
 
 	cv::Mat combined = shaft + head;
+  cv::flip(combined, combined, 0);
 	cap << combined;
 
 }
@@ -940,8 +963,8 @@ void vizApp::draw2DTrack(){
 
 	//static bool first = true;
 	
-	static std::ofstream ofs("z:/pose_data.txt");
-
+	static std::ofstream ofs("pose_data.txt");
+  
   cv::Mat frame = left_eye.getFrame();
   cv::Mat ff; cv::flip(frame, ff, 0);
 
@@ -951,7 +974,7 @@ void vizApp::draw2DTrack(){
   glDisable(GL_TEXTURE_2D);
 
 	camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
-	boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
+  boost::shared_ptr<SE3DaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<SE3DaVinciPoseGrabber>(trackables_[0]);
 	ci::Matrix44f shaft_pose, head_pose, clasper_left_pose, clasper_right_pose;
 	shaft_pose = lnd->GetPose();
 	lnd->GetModelPose(head_pose, clasper_left_pose, clasper_right_pose);
@@ -1066,13 +1089,13 @@ void vizApp::loadTrackables(const ConfigReader &reader, const std::string &outpu
 void vizApp::loadTrackable(const std::string &filepath, const std::string &output_dir){
 
   ConfigReader reader(filepath);
-  try{
-    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
-    return;
-  }
-  catch (std::runtime_error){
-
-  }
+  //try{
+  //  trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
+   // return;
+  //}
+  //catch (std::runtime_error){
+  //
+  //}
   try{
     trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new SE3DaVinciPoseGrabber(reader, output_dir)));
     return;
@@ -1153,10 +1176,18 @@ void vizApp::keyDown(KeyEvent event){
     return;
   }
 
-  //else if (event.getChar() == 's'){
-  //  save_toggle_ = !save_toggle_;
-  //  return;
-  //}
+  else if (event.getChar() == 'c'){
+  
+    for (auto &tracked_model : trackables_){
+
+
+      boost::shared_ptr<DHDaVinciPoseGrabber> h = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(tracked_model);
+
+      h->SetOffsetsToNull();
+
+    }
+
+  }
   //
   //else if (event.getCode() == KeyEvent::KEY_ESCAPE){
   //  shutdown();
