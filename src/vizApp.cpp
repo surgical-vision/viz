@@ -933,7 +933,7 @@ void vizApp::drawSegmentation(){
 
 	static bool first = true;
 	static gl::Fbo framebuffer(camera_image_width_, camera_image_height_);
-	static cv::VideoWriter cap("c:/users/davinci/Desktop/ChallengeDataset/" + DATASET_TARGET + "/PSM1_Segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
+	static cv::VideoWriter cap("PSM1_Segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
 	
 	framebuffer.bindFramebuffer();
 
@@ -1106,7 +1106,7 @@ void vizApp::draw2DTrack(){
 
 	//static bool first = true;
 	
-	static std::ofstream ofs("C:/Users/davinci/Desktop/ChallengeDataset/" + DATASET_TARGET + "/PSM1_Pose.txt");
+	static std::ofstream ofs("PSM1_Pose.txt");
     
   cv::Mat frame;
   cv::flip(left_eye.getFrame(), frame, 0);
@@ -1118,7 +1118,7 @@ void vizApp::draw2DTrack(){
   glDisable(GL_TEXTURE_2D);
 
 	camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
-	boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
+  boost::shared_ptr<SE3DaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<SE3DaVinciPoseGrabber>(trackables_[0]);
 	ci::Matrix44f shaft_pose, head_pose, clasper_left_pose, clasper_right_pose;
 	shaft_pose = lnd->GetPose();
 	lnd->GetModelPose(head_pose, clasper_left_pose, clasper_right_pose);
@@ -1302,7 +1302,7 @@ void vizApp::draw2DTrack(){
   ss << angle_between_clasper;
   cv::putText(TEST_OUTPUT, ss.str(), cv::Point(center_of_head[0], center_of_head[1]) + 20 * cv::Point(unit_vector_to_clasper[0], unit_vector_to_clasper[1]), CV_FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 0, 0));
   
-  static cv::VideoWriter vwriter("c:/users/davinci/Desktop/ChallengeDataset/" + DATASET_TARGET + "/PSM1.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
+  static cv::VideoWriter vwriter("PSM1.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
   vwriter << TEST_OUTPUT;
 
   ofs << to_write.str() << "\n";
