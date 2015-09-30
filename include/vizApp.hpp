@@ -62,7 +62,10 @@ namespace viz {
     gl::Fbo head_framebuffer;
     gl::Fbo clasper1_framebuffer;
     gl::Fbo clasper2_framebuffer;
+    gl::Fbo clasper1_base_framebuffer;
+    gl::Fbo clasper2_base_framebuffer;
 
+    ci::Vec2i GetEndOfShaft(ci::Vec2f &shaft_start, ci::Vec2f &shaft_end);
 
     virtual void setup() override;
     virtual void mouseDown(MouseEvent event) override;
