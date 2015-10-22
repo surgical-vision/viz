@@ -522,7 +522,7 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
     }
 
   }
-  if (do_draw_ == false) return false;
+  //if (do_draw_ == false) return false;
 
   model_.Shaft().transform_ = shaft_pose_;
 
@@ -632,3 +632,66 @@ void DHDaVinciPoseGrabber::DrawClaspers2(){
   model_.DrawRightClasper();
 
 }
+
+
+void SE3DaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right){
+
+  if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
+
+    model_.Shaft().transform_ = shaft_pose_;
+
+    viz::davinci::PSMData psm;
+    for (size_t i = 0; i < num_wrist_joints_; ++i){
+      psm.jnt_pos[i] = wrist_dh_params_[i];
+    }
+
+
+    if (target_joint_ == davinci::PSM1)
+      buildKinematicChainAtEndPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+    else if (target_joint_ == davinci::PSM2)
+      buildKinematicChainAtEndPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+
+    head = model_.Head().transform_;
+    clasper_left = model_.Clasper1().transform_;
+    clasper_right = model_.Clasper2().transform_;
+
+  }
+  else{
+
+    throw std::runtime_error("Error, bad joint type");
+
+  }
+
+}
+
+
+
+void SE3DaVinciPoseGrabber::DrawBody(){
+
+  model_.DrawBody();
+
+}
+
+
+void SE3DaVinciPoseGrabber::DrawHead(){
+
+  model_.DrawHead();
+  model_.DrawLeftClasper();
+  model_.DrawRightClasper();
+
+}
+//
+//void DHDaVinciPoseGrabber::DrawBody(){
+//
+//  model_.DrawBody();
+//
+//}
+//
+//
+//void DHDaVinciPoseGrabber::DrawHead(){
+//
+//  model_.DrawHead();
+//  model_.DrawLeftClasper();
+//  model_.DrawRightClasper();
+//
+//}

@@ -929,11 +929,21 @@ cv::Mat CombineShaftAndHead(const cv::Mat &body, const cv::Mat &head, unsigned c
 
 }
 
+cv::Mat GetPartsSegmentation(cv::Mat &im){
+
+  cv::Mat ret = cv::Mat::zeros(im.size(), CV_8UC1);
+
+  return ret;
+
+
+
+}
+
 void vizApp::drawSegmentation(){
 
 	static bool first = true;
 	static gl::Fbo framebuffer(camera_image_width_, camera_image_height_);
-	static cv::VideoWriter cap("PSM1_Segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
+	static cv::VideoWriter cap("PSM2_Segmentation.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, cv::Size(camera_image_width_, camera_image_height_));
 	
 	framebuffer.bindFramebuffer();
 
@@ -942,10 +952,15 @@ void vizApp::drawSegmentation(){
 	gl::pushMatrices();
 
 	camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
-	boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
+  boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
 
-  gl::clear();
+  gl::clear(ci::Color(1.0,0,0));
 	lnd->DrawBody();
+  lnd->DrawHead();
+
+  cv::Mat res = toOcv(framebuffer.getTexture());
+  //res = GetPartSegmentation(res);
+
 	cv::Mat body = toOcv(framebuffer.getDepthTexture());
 
 	gl::clear();
@@ -1106,7 +1121,12 @@ void vizApp::draw2DTrack(){
 
 	//static bool first = true;
 	
-	static std::ofstream ofs("PSM1_Pose.txt");
+  bool PSM1 = false;
+  std::string pose_file;
+  if (PSM1) pose_file = "PSM1_Pose.txt";
+  else pose_file = "PSM2_Pose.txt";
+
+	static std::ofstream ofs(pose_file);
     
   cv::Mat frame;
   cv::flip(left_eye.getFrame(), frame, 0);
@@ -1118,7 +1138,7 @@ void vizApp::draw2DTrack(){
   glDisable(GL_TEXTURE_2D);
 
 	camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
-  boost::shared_ptr<SE3DaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<SE3DaVinciPoseGrabber>(trackables_[0]);
+  boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[0]);
 	ci::Matrix44f shaft_pose, head_pose, clasper_left_pose, clasper_right_pose;
 	shaft_pose = lnd->GetPose();
 	lnd->GetModelPose(head_pose, clasper_left_pose, clasper_right_pose);
@@ -1141,6 +1161,7 @@ void vizApp::draw2DTrack(){
 	gl::clear();
   gl::color(1.0, 1.0, 1.0);
 	gl::pushModelView();
+  //ci::gl::multModelView(shaft_pose);
 	gl::multModelView(head_pose);
 	gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
   head_framebuffer.unbindFramebuffer();
@@ -1152,6 +1173,8 @@ void vizApp::draw2DTrack(){
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
 	gl::pushModelView();
+  //ci::gl::multModelView(shaft_pose);
+  //gl::multModelView(head_pose);
   gl::multModelView(clasper_left_pose);
   gl::drawLine(ci::Vec3f(0, 0, 0), ci::Vec3f(2.5, 0, 10));
 	gl::popModelView();
@@ -1163,6 +1186,8 @@ void vizApp::draw2DTrack(){
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
   gl::pushModelView();
+  //ci::gl::multModelView(shaft_pose);
+  //gl::multModelView(head_pose);
   gl::multModelView(clasper_left_pose);
   gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
   gl::popModelView();
@@ -1175,6 +1200,8 @@ void vizApp::draw2DTrack(){
   gl::clear();
 	gl::pushModelView();
   //lnd->DrawClaspers2();
+  //ci::gl::multModelView(shaft_pose);
+  //gl::multModelView(head_pose);
   gl::multModelView(clasper_right_pose);
   gl::drawLine(ci::Vec3f(0, 0, 0), ci::Vec3f(-2.5, 0, 10));
 	gl::popModelView();
@@ -1186,6 +1213,8 @@ void vizApp::draw2DTrack(){
   gl::color(1.0, 1.0, 1.0);
   gl::clear();
   gl::pushModelView();
+  //ci::gl::multModelView(shaft_pose);
+ // gl::multModelView(head_pose);
   gl::multModelView(clasper_right_pose);
   gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
   gl::popModelView();
@@ -1214,7 +1243,7 @@ void vizApp::draw2DTrack(){
   cv::flip(clasper_left_base_, clasper_left_base, 0); cv::flip(clasper_right_base_, clasper_right_base, 0);
 
   ci::Vec2f center_of_head = GetCOM(head);
-  ci::Vec2f start_of_shaft = GetEnd(shaft_axis, true);
+  ci::Vec2f start_of_shaft = GetEnd(shaft_axis, PSM1);
   ci::Vec2f instrument_tracked_point = GetEndOfShaft(center_of_head, start_of_shaft);
   
 	ci::Vec2f center_of_l_clasper = GetCOM(clasper_left);
@@ -1231,6 +1260,9 @@ void vizApp::draw2DTrack(){
     cv::line(all_frame, cv::Point(start_of_shaft[0], start_of_shaft[1]), cv::Point(instrument_tracked_point[0], instrument_tracked_point[1]), cv::Scalar(255, 0, 0), 2);
     unit_vector_along_shaft = instrument_tracked_point - start_of_shaft;
     unit_vector_along_shaft.normalize();
+  }
+  else{
+    ci::app::console() << "This is bad" << std::endl;
   }
   
   //mark the tracked point
@@ -1302,7 +1334,7 @@ void vizApp::draw2DTrack(){
   ss << angle_between_clasper;
   cv::putText(TEST_OUTPUT, ss.str(), cv::Point(center_of_head[0], center_of_head[1]) + 20 * cv::Point(unit_vector_to_clasper[0], unit_vector_to_clasper[1]), CV_FONT_HERSHEY_PLAIN, 1, cv::Scalar(255, 0, 0));
   
-  static cv::VideoWriter vwriter("PSM1.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
+  static cv::VideoWriter vwriter("PSM2.avi", CV_FOURCC('D', 'I', 'B', ' '), 25, all_frame.size());
   vwriter << TEST_OUTPUT;
 
   ofs << to_write.str() << "\n";

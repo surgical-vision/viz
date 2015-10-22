@@ -311,6 +311,12 @@ namespace viz {
   class SE3DaVinciPoseGrabber : public BaseDaVinciPoseGrabber {
 
   public:
+    
+    void DrawBody();
+    void DrawHead();
+    void DrawClaspers1();
+    void DrawClaspers2();
+    void GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right);
 
     /**
     * Construct from a configuration file.
