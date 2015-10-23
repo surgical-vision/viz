@@ -86,9 +86,6 @@ namespace viz {
 
   protected:
 
-	void drawSegmentation();
-	void draw2DTrack();
-
     SubWindow left_eye;
     SubWindow right_eye;
     SubWindow gui_port;
