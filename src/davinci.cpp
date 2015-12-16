@@ -21,6 +21,7 @@ This file was based on work by Philip Pratt, Imperial College London. Used with 
 **/
 
 #include "davinci.hpp"
+#include <cinder/app/App.h>
 
 using namespace viz::davinci;
 
@@ -295,6 +296,18 @@ void viz::davinci::buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain,
   grip1 = grip1d;
   grip2 = grip2d;
 
+  ci::app::console() << "FROM PSM 2 " << std::endl;
+  
+  ci::app::console() << "Roll = \n" << roll << std::endl;
+
+  ci::app::console() << "Wrist pitch = \n" << wrist_pitch << std::endl;
+
+  ci::app::console() << "Grip 1 = \n" << grip1 << std::endl;
+
+  ci::app::console() << "Grip 2 = \n" << grip2 << std::endl;
+
+  ci::app::console() << "----------------" << std::endl;
+
 }
 
 void viz::davinci::buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, const ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2){
@@ -340,13 +353,16 @@ void viz::davinci::buildKinematicChainECM1(DaVinciKinematicChain &mDaVinciChain,
   glhSetIdentity(A);
 
   extendChain(mDaVinciChain.mWorldOriginSUJ3Origin[0], A);
+
   extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[0], A, ecm.sj_joint_angles[0]);
   extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[1], A, ecm.sj_joint_angles[1]);
   extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[2], A, ecm.sj_joint_angles[2]);
   extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[3], A, ecm.sj_joint_angles[3]);
   extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[4], A);
   extendChain(mDaVinciChain.mSUJ3OriginSUJ3Tip[5], A);
+
   extendChain(mDaVinciChain.mSUJ3TipECM1Origin[0], A);
+
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[0], A, ecm.jnt_pos[0]);
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[1], A, ecm.jnt_pos[1]);
   extendChain(mDaVinciChain.mECM1OriginECM1Tip[2], A, ecm.jnt_pos[2]);
@@ -448,8 +464,17 @@ void viz::davinci::buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain,
   grip1 = grip1d;
   grip2 = grip2d;
 
+  ci::app::console() << "FROM PSM 1 " << std::endl;
 
+  ci::app::console() << "Roll = \n" << roll << std::endl;
 
+  ci::app::console() << "Wrist pitch = \n" << wrist_pitch << std::endl;
+  
+  ci::app::console() << "Grip 1 = \n" << grip1 << std::endl;
+
+  ci::app::console() << "Grip 2 = \n" << grip2 << std::endl;
+  
+  ci::app::console() << "----------------" << std::endl;
 
 }
 

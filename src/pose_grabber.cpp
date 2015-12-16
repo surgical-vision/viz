@@ -89,7 +89,13 @@ PoseGrabber::PoseGrabber(const ConfigReader &reader, const std::string &output_d
   self_name_ = "pose-grabber";
   checkSelfName(reader.get_element("name"));
 
-  model_.LoadData(reader.get_element("model-file"));
+  try{
+    model_.LoadData(reader.get_element("model-file"));
+  }
+  catch (std::runtime_error){
+    //e.g. no model
+  }
+  
   
   ifs_.open(reader.get_element("pose-file"));
 
@@ -395,13 +401,23 @@ bool DHDaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_base_joints,
       double x;
       arm_ifs_ >> x;
       psm_arm_joints[i] = x;
+
+      ci::app::console() << x << ", ";
+
     }
+
+    ci::app::console() << "\n";
 
     for (int i = 0; i < num_base_joints_; ++i){
       double x;
       base_ifs_ >> x;
       psm_base_joints[i] = x;
+
+      ci::app::console() << x << ", ";
+
     }
+
+    ci::app::console() << std::endl;
 
   }
   catch (std::ifstream::failure){
@@ -479,10 +495,12 @@ void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  
 
 }
 
-SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : BaseDaVinciPoseGrabber(reader, output_dir) {
+SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir, bool check_type) : BaseDaVinciPoseGrabber(reader, output_dir) {
 
-  self_name_ = "se3-davinci-grabber";
-  checkSelfName(reader.get_element("name"));
+  if (check_type){
+    self_name_ = "se3-davinci-grabber";
+    checkSelfName(reader.get_element("name"));
+  }
 
   if (reader.get_element("joint") == "PSM1")
     target_joint_ = davinci::DaVinciJoint::PSM1;
@@ -639,7 +657,6 @@ void DHDaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clas
 
 }
 
-
 void SE3DaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right){
 
   if (target_joint_ == davinci::PSM1 || target_joint_ == davinci::PSM2){
@@ -670,14 +687,11 @@ void SE3DaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &cla
 
 }
 
-
-
 void SE3DaVinciPoseGrabber::DrawBody(){
 
   model_.DrawBody();
 
 }
-
 
 void SE3DaVinciPoseGrabber::DrawHead(){
 
@@ -693,11 +707,81 @@ void DHDaVinciPoseGrabber::DrawBody(){
 
 }
 
-
 void DHDaVinciPoseGrabber::DrawHead(){
 
 	model_.DrawHead();
   model_.DrawLeftClasper();
   model_.DrawRightClasper();
+
+}
+
+bool QuaternionPoseGrabber::LoadPose(const bool update_as_new){
+
+  do_draw_ = false; //set to true only if we read a 'good' pose
+
+  //load the new pose (if requested).
+  if (update_as_new){
+    try{
+      std::string line;
+      int row = 0;
+      while (ifs_.good()){
+        std::getline(ifs_, line);
+        if (line[0] == '#' || line.length() < 1) continue;
+        break;
+      }
+      std::stringstream ss(line);
+      
+      ci::Vec4f quats;
+      for (size_t col = 0; col < 4; ++col){
+        float val;
+        ss >> val;
+        quats[col] = val;
+      }
+
+      shaft_pose_ = ci::Quatf(quats[0], quats[1], quats[2], quats[3]);
+
+      ci::Vec3f translation;
+      for (size_t col = 0; col < 3; ++col){
+        float val;
+        ss >> val;
+        translation[col] = val;
+      }
+
+      shaft_pose_.setTranslate(translation);
+
+      //update the reference list of old tracks for drawing trajectories
+      reference_frame_tracks_.push_back(shaft_pose_);
+      do_draw_ = true;
+
+    }
+    catch (std::ofstream::failure e){
+      shaft_pose_.setToIdentity();
+      do_draw_ = false;
+      return false;
+    }
+  }
+
+  // update the model with the pose
+  model_.Shaft().transform_ = shaft_pose_;
+
+  viz::davinci::PSMData psm;
+  for (size_t i = 0; i < num_wrist_joints_; ++i){
+    psm.jnt_pos[i] = wrist_dh_params_[i];
+  }
+
+  if (target_joint_ == davinci::PSM1)
+    buildKinematicChainAtEndPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+  else if (target_joint_ == davinci::PSM2)
+    buildKinematicChainAtEndPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+
+  return true;
+
+
+}
+
+QuaternionPoseGrabber::QuaternionPoseGrabber(const ConfigReader &reader, const std::string &output_dir) : SE3DaVinciPoseGrabber(reader, output_dir, false) {
+
+  self_name_ = "quaternion-pose-grabber";
+  checkSelfName(reader.get_element("name"));
 
 }

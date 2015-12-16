@@ -129,10 +129,12 @@ namespace viz {
 
   public:
     
+    PoseGrabber(const std::string &output_dir) : BasePoseGrabber(output_dir) {}
+
     /**
     * Load a pose grabber from a config file. This file contains the model coordinate file (if applicable) and pose file.
     */
-    explicit PoseGrabber(const ConfigReader &reader, const std::string &output_dir);
+    PoseGrabber(const ConfigReader &reader, const std::string &output_dir);
 
     /**
     * Load the next SE3 pose transform from the file. This changes the class' internal representation of its pose when it renders the model.
@@ -332,12 +334,13 @@ namespace viz {
 
   public:
 
+
     /**
     * Construct from a configuration file.
     * @param[in] reader The configuration file reader containing the data about the instrument.
     * @param[in] output_dir The output directory where this session is storing files.
     */
-    SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir);
+    SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir, bool check_type = true);
 
     virtual void WritePoseToStream();
 
@@ -377,6 +380,29 @@ namespace viz {
   };
 
 
+  /**
+  * @class QuaternionPoseGrabber
+  * @brief Load pose as a Quaternion + translation
+  *
+  */
 
+  class QuaternionPoseGrabber : public SE3DaVinciPoseGrabber {
+
+  public:
+
+    /**
+    * Load a pose grabber from a config file. This file contains the model coordinate file (if applicable) and pose file.
+    */
+    QuaternionPoseGrabber(const ConfigReader &reader, const std::string &output_dir);
+
+    /**
+    * Load the next SE3 pose transform from the file. This changes the class' internal representation of its pose when it renders the model.
+    * @param[in] no_reload Just refresh the internal representation of pose without reading anything from the pose file. This is useful if the pose can be manually modified within the UI to account for a rigid offset.
+    * @return The success of the load (false if for instance there are no poses left to read from the file).
+    */
+    virtual bool LoadPose(const bool no_reload);
+
+
+  };
 
 }

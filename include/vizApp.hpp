@@ -58,15 +58,6 @@ namespace viz {
 
   public:
 
-    gl::Fbo shaft_framebuffer;
-    gl::Fbo head_framebuffer;
-    gl::Fbo clasper1_framebuffer;
-    gl::Fbo clasper2_framebuffer;
-    gl::Fbo clasper1_base_framebuffer;
-    gl::Fbo clasper2_base_framebuffer;
-
-    ci::Vec2i GetEndOfShaft(ci::Vec2f &shaft_start, ci::Vec2f &shaft_end);
-
     virtual void setup() override;
     virtual void mouseDown(MouseEvent event) override;
     virtual void update() override;
@@ -85,6 +76,8 @@ namespace viz {
     static void AddSubWindow(SubWindow *sbw) { sub_windows_.push_back(sbw); }
 
   protected:
+
+    void save2DTrack();
 
     SubWindow left_eye;
     SubWindow right_eye;
@@ -252,6 +245,9 @@ namespace viz {
     static std::vector<SubWindow *> sub_windows_; /**< A set of pointers to the various SubWindows in the display. Allows easy iteration over these windows for saving etc. */
 
     bool reset_viz_port_; /**< Flag to reset the vizport if we move the MayaCam too far away. */
+
+    gl::Fbo shaft_framebuffer;
+    gl::Fbo head_framebuffer;
 
   };
 

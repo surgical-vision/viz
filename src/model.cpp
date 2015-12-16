@@ -122,7 +122,7 @@ std::vector<ci::Matrix44f> Model::GetTransformSet() const{
 }
 
 void Model::SetTransformSet(const std::vector<ci::Matrix44f> &transforms){
-  assert(transforms.size() == 0);
+  assert(transforms.size() == 1);
   body_.transform_ = transforms[0];
 }
 

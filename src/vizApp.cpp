@@ -127,8 +127,12 @@ void vizApp::setupFromConfig(const std::string &path){
 
     if (reader.has_element("tracked-camera")){
 
-      tracked_camera_.reset(new PoseGrabber(ConfigReader(root_dir + "/" + reader.get_element("tracked-camera")), output_dir_this_run)); //if there is no moveable camera then there won't be a tracked camera
-
+      try{
+        tracked_camera_.reset(new PoseGrabber(ConfigReader(root_dir + "/" + reader.get_element("tracked-camera")), output_dir_this_run)); //if there is no moveable camera then there won't be a tracked camera
+      }
+      catch (std::runtime_error){
+        tracked_camera_.reset(new QuaternionPoseGrabber(ConfigReader(root_dir + "/" + reader.get_element("tracked-camera")), output_dir_this_run)); //if there is no moveable camera then there won't be a tracked camera
+      }
     }
 
     loadTrackables(reader, output_dir_this_run);
@@ -272,13 +276,6 @@ void vizApp::setup(){
    
   setupGUI();
  
-  shaft_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
-  head_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
-  clasper1_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
-  clasper2_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
-  clasper1_base_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
-  clasper2_base_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
-
   ci::app::setFrameRate(90);
 
 }
@@ -365,11 +362,6 @@ void vizApp::updateVideo(){
 void vizApp::update(){
  
   if (!running_) return;
-
-  static bool first = true;
-  if (!first)
-    saveState();
-  first = false;
 
   updateModels();
 
@@ -467,18 +459,212 @@ void vizApp::draw(){
   drawCameraTracker();
   trajectory_viewer.UnBind();
   trajectory_viewer.Draw();
-
-  ////////////
-
-  //drawSegmentation();
-  //draw2DTrack();
-
-  ///////////
-
+  
   saveState();
 
   state.load_one = false;
   state.save_one = false;
+
+}
+
+ci::Vec2f GetEnd(cv::Mat &image, bool IS_PSM_1){
+
+  std::vector<cv::Point> line;
+  for (int r = 0; r < image.rows; ++r){
+    for (int c = 0; c < image.cols; ++c){
+      if (image.at<cv::Vec4b>(r, c)[0] != 0.0){
+        line.push_back(cv::Point(c, r));
+      }
+    }
+  }
+
+  if (line.size() == 0) return ci::Vec2f(-1, -1);
+
+  //sort so that the right most values are first and the left most are last
+  std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
+
+  if (IS_PSM_1){
+    //return ci::Vec2f(line.back().x, line.back().y);
+    return ci::Vec2f(line.front().x, line.front().y);
+
+  }
+  else{
+    //return ci::Vec2f(line.front().x, line.front().y);
+    return ci::Vec2f(line.back().x, line.back().y);
+  }
+
+}
+
+ci::Vec2f GetCenter(cv::Mat &image, bool IS_PSM_1){
+
+  std::vector<cv::Point> line;
+  for (int r = 0; r < image.rows; ++r){
+    for (int c = 0; c < image.cols; ++c){
+      if (image.at<cv::Vec4b>(r, c)[0] != 0.0){
+        line.push_back(cv::Point(c, r));
+      }
+    }
+  }
+
+  if (line.size() == 0) return ci::Vec2f(-1, -1);
+
+  std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
+
+  if (IS_PSM_1){
+    return ci::Vec2f(line.front().x, line.front().y);
+  }
+  else{
+    return ci::Vec2f(line.back().x, line.back().y);
+  }
+
+}
+
+ci::Vec2f GetVector(cv::Mat &image, bool IS_PSM_1){
+
+  std::vector<cv::Point> line;
+  for (int r = 0; r < image.rows; ++r){
+    for (int c = 0; c < image.cols; ++c){
+      if (image.at<cv::Vec4b>(r, c)[0] != 0.0){
+        line.push_back(cv::Point(c, r));
+      }
+    }
+  }
+
+  if (line.size() == 0) return ci::Vec2f(0, 0);
+
+  std::sort(line.begin(), line.end(), [](cv::Point a, cv::Point b){ return a.x > b.x; });
+
+  cv::Point v = line.front() - line.back();
+  cv::Vec2f vf((float)v.x / std::sqrt(v.x*v.x + v.y*v.y), (float)v.y / std::sqrt(v.x*v.x + v.y*v.y));
+
+  if (IS_PSM_1)
+    return ci::Vec2f(vf[0], vf[1]);
+  else
+    return -ci::Vec2f(vf[0], vf[1]);
+
+}
+
+ci::Vec2i GetCOM(cv::Mat &image){
+
+  cv::Vec2f com;
+  size_t count = 0;
+  for (int r = 0; r < image.rows; ++r){
+    for (int c = 0; c < image.cols; ++c){
+      if (image.at<cv::Vec4b>(r, c)[0] != 0.0){
+        com += cv::Vec2f(c, r);
+        count++;
+      }
+    }
+  }
+
+  if (count == 0) return ci::Vec2f(-1, -1);
+
+  return ci::Vec2i(com[0] / count, com[1] / count);
+
+
+}
+
+void vizApp::save2DTrack(){
+
+  static std::vector<std::ofstream> files;
+  static std::vector<float> scales;
+
+  if (files.size() == 0){
+
+    shaft_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
+    head_framebuffer = gl::Fbo(camera_image_width_, camera_image_height_);
+
+    for (size_t i = 0; i < trackables_.size(); ++i){
+      std::stringstream ss;
+      if (!boost::filesystem::exists(SubWindow::output_directory)){
+        boost::filesystem::create_directory(SubWindow::output_directory);
+      }
+      ss << SubWindow::output_directory << "/track_file" << i << ".txt";
+      files.push_back(std::ofstream(ss.str(), 'w'));
+      
+    }
+
+    
+
+  }
+
+
+  for (size_t i = 0; i < files.size(); ++i){
+
+    gl::enableDepthRead();
+    gl::enableDepthWrite();
+    gl::pushMatrices();
+    glDisable(GL_TEXTURE_2D);
+
+    camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
+    boost::shared_ptr<DHDaVinciPoseGrabber> lnd = boost::dynamic_pointer_cast<DHDaVinciPoseGrabber>(trackables_[i]);
+    ci::Matrix44f shaft_pose, head_pose, clasper_left_pose, clasper_right_pose;
+    shaft_pose = lnd->GetPose();
+    lnd->GetModelPose(head_pose, clasper_left_pose, clasper_right_pose);
+
+    //shaft 
+    shaft_framebuffer.bindFramebuffer();
+    gl::clear();
+    gl::color(1.0, 1.0, 1.0);
+    ci::Vec3f origin(0, 0, 0);
+    ci::Vec3f shaft_dir(0, 0, -5);
+    gl::pushModelView();
+    ci::gl::multModelView(shaft_pose);
+    gl::drawLine(origin, shaft_dir);
+
+    float current_scale = 1.0;
+
+    if (scales.size() <= i){
+      ci::Matrix44f pose = ci::gl::getModelView();
+      scales.push_back(pose.getTranslate().z);
+    }
+    else{
+      ci::Matrix44f pose = ci::gl::getModelView();
+      current_scale = scales[i] / pose.getTranslate().z;
+    }
+
+    gl::popModelView();
+    shaft_framebuffer.unbindFramebuffer();
+    glFinish();
+
+    //head
+    head_framebuffer.bindFramebuffer();
+    gl::clear();
+    gl::color(1.0, 1.0, 1.0);
+    gl::pushModelView();
+    //ci::gl::multModelView(shaft_pose);
+    gl::multModelView(head_pose);
+    gl::drawSphere(ci::Vec3f(0, 0, 0), 3);
+    head_framebuffer.unbindFramebuffer();
+    gl::popModelView();
+    glFinish();
+
+    cv::Mat shaft_axis_ = toOcv(shaft_framebuffer.getTexture());
+    cv::Mat shaft_axis;
+    cv::flip(shaft_axis_, shaft_axis, 0);
+    cv::Mat head_ = toOcv(head_framebuffer.getTexture());
+    cv::Mat head;
+    cv::flip(head_, head, 0);
+
+    ci::Vec2f center_of_head = GetCOM(head);
+    ci::Vec2f start_of_shaft = GetEnd(shaft_axis, i == 0);
+
+
+    ci::Vec2f unit_vector_along_shaft(-1, -1);
+    if (start_of_shaft != ci::Vec2f(-1, -1) && center_of_head != ci::Vec2f(-1, -1)){
+      unit_vector_along_shaft = center_of_head - start_of_shaft;
+      unit_vector_along_shaft.normalize();
+    }
+
+    gl::popMatrices();
+    camera_.unsetCameras(); //reset the viewport values
+    glEnable(GL_TEXTURE_2D);
+
+    std::stringstream to_write;
+    to_write << center_of_head[0] << ", " << center_of_head[1] << ", " << unit_vector_along_shaft[0] << ", " << unit_vector_along_shaft[1] << ", " << current_scale;
+    files[i] << to_write.str() << std::endl;
+
+  }
 
 }
 
@@ -750,6 +936,7 @@ void vizApp::saveState(){
     }
     savePoses();
     state.save_one = false;
+    save2DTrack();
   }
 
 }
@@ -791,7 +978,10 @@ void vizApp::drawTargets(){
 
 ci::Matrix44f vizApp::getCameraPose(){
 
-  if (moveable_camera_){
+  if (tracked_camera_){
+    return tracked_camera_->GetPose();
+  }
+  else if (moveable_camera_){
     return moveable_camera_->GetPose();
   }
   else{
@@ -855,6 +1045,14 @@ void vizApp::loadTrackable(const std::string &filepath, const std::string &outpu
 
   ConfigReader reader(filepath);
   try{
+    trackables_.push_back(boost::shared_ptr<QuaternionPoseGrabber>(new QuaternionPoseGrabber(reader, output_dir)));
+    return;
+  }
+  catch (std::runtime_error){
+
+  }
+
+  try{
     trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
     return;
   }
@@ -875,6 +1073,9 @@ void vizApp::loadTrackable(const std::string &filepath, const std::string &outpu
   catch (std::runtime_error){
 
   }
+  
+
+
 }
 
 void vizApp::drawGrid(float size, float step, float plane_position){
