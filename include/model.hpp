@@ -71,7 +71,7 @@ namespace viz {
     * Draw a single RenderData model
     * @param[in] rd The model to draw.
     */
-    void InternalDraw(const RenderData &rd) const;
+    void InternalDraw(const RenderData &rd, const float inc=0) const;
 
     ci::JsonTree OpenFile(const std::string &datafile_path) const;
     

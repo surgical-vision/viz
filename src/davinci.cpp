@@ -296,18 +296,6 @@ void viz::davinci::buildKinematicChainPSM2(DaVinciKinematicChain &mDaVinciChain,
   grip1 = grip1d;
   grip2 = grip2d;
 
-  ci::app::console() << "FROM PSM 2 " << std::endl;
-  
-  ci::app::console() << "Roll = \n" << roll << std::endl;
-
-  ci::app::console() << "Wrist pitch = \n" << wrist_pitch << std::endl;
-
-  ci::app::console() << "Grip 1 = \n" << grip1 << std::endl;
-
-  ci::app::console() << "Grip 2 = \n" << grip2 << std::endl;
-
-  ci::app::console() << "----------------" << std::endl;
-
 }
 
 void viz::davinci::buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciChain, const PSMData& psm, const ci::Matrix44f &roll, ci::Matrix44f &wrist_pitch, ci::Matrix44f &grip1, ci::Matrix44f &grip2){
@@ -463,18 +451,6 @@ void viz::davinci::buildKinematicChainPSM1(DaVinciKinematicChain &mDaVinciChain,
   
   grip1 = grip1d;
   grip2 = grip2d;
-
-  ci::app::console() << "FROM PSM 1 " << std::endl;
-
-  ci::app::console() << "Roll = \n" << roll << std::endl;
-
-  ci::app::console() << "Wrist pitch = \n" << wrist_pitch << std::endl;
-  
-  ci::app::console() << "Grip 1 = \n" << grip1 << std::endl;
-
-  ci::app::console() << "Grip 2 = \n" << grip2 << std::endl;
-  
-  ci::app::console() << "----------------" << std::endl;
 
 }
 

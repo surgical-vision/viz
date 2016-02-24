@@ -936,7 +936,6 @@ void vizApp::saveState(){
     }
     savePoses();
     state.save_one = false;
-    save2DTrack();
   }
 
 }
@@ -966,9 +965,39 @@ void vizApp::shutdown(){
 
 }
 
+inline ci::Vec3f GetExtrinsicEulers(const ci::Matrix33f &m){
+
+
+
+}
+
+
+
+inline ci::Vec3f GetIntrinsicEulers(const ci::Matrix33f &m){
+
+
+
+}
+
 void vizApp::drawTargets(){
 
+  static ci::Matrix44f m;
+  
   for (size_t i = 0; i < trackables_.size(); ++i){
+
+    //if (m != moveable_camera_->GetPose() * trackables_[i]->GetPose()){
+
+    //  //ci::app::console() << "Pose = \n" << moveable_camera_->GetPose().inverted() * trackables_[i]->GetPose();
+    //  m = moveable_camera_->GetPose() * trackables_[i]->GetPose();
+
+    //  ci::Matrix33f m33 = m.subMatrix33(0,0);
+    //  ci::Quatf q = m33;
+    //  ci::app::console() << "Pitch = " << q.getPitch() << std::endl;
+    //  ci::app::console() << "Roll = " << q.getRoll() << std::endl;
+    //  ci::app::console() << "Yaw = " << q.getYaw() << std::endl;
+
+
+    //}
 
     trackables_[i]->Draw();
 
@@ -1044,13 +1073,6 @@ void vizApp::loadTrackables(const ConfigReader &reader, const std::string &outpu
 void vizApp::loadTrackable(const std::string &filepath, const std::string &output_dir){
 
   ConfigReader reader(filepath);
-  try{
-    trackables_.push_back(boost::shared_ptr<QuaternionPoseGrabber>(new QuaternionPoseGrabber(reader, output_dir)));
-    return;
-  }
-  catch (std::runtime_error){
-
-  }
 
   try{
     trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
@@ -1059,8 +1081,17 @@ void vizApp::loadTrackable(const std::string &filepath, const std::string &outpu
   catch (std::runtime_error){
   
   }
+
   try{
     trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new SE3DaVinciPoseGrabber(reader, output_dir)));
+    return;
+  }
+  catch (std::runtime_error){
+
+  }
+
+  try{
+    trackables_.push_back(boost::shared_ptr<QuaternionPoseGrabber>(new QuaternionPoseGrabber(reader, output_dir)));
     return;
   }
   catch (std::runtime_error){

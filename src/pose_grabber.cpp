@@ -350,18 +350,6 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
     else if (target_joint_ == davinci::PSM2)
       buildKinematicChainPSM2(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
 
-    //ci::app::console() << "Current setup joint values: ";
-    //for (std::size_t i = 0; i < base_joints_.size(); ++i){
-    //  ci::app::console() << psm.sj_joint_angles[i] << " ";
-    //}
-    //ci::app::console() << std::endl
-
-    //ci::app::console() << "Current joint values: ";
-    //for (std::size_t i = 0; i < arm_joints_.size(); ++i){
-    //  ci::app::console() << psm.jnt_pos[i] << " ";
-    //}
-    //ci::app::console() << std::endl;
-
     return model_.Shaft().transform_;
 
   }
@@ -512,6 +500,7 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
     throw std::runtime_error("Error, bad joint");
 
   ifs_.open(reader.get_element("pose-file"));
+  if (!ifs_.is_open()) throw std::runtime_error("Could not open file!\n");
   ofs_file_ = output_dir + "/" + reader.get_element("output-pose-file");
 
   num_wrist_joints_ = 3; //should this load from config file?
@@ -531,33 +520,36 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
     try{
       std::string line;
       int row = 0;
-      //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
+      cv::Vec3f rotation;
       ci::Vec3f translation;
-      ci::Vec4f rotation;
-      ci::Vec4f articulation;
+      ci::Vec3f articulation;
+      //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
+      for (int i = 0; i < 3; ++i){
+        ifs_ >> rotation[i];
+      }
+
       for (int i = 0; i < 3; ++i){
         ifs_ >> translation[i];
       }
-      for (int i = 0; i < 4; ++i){
-        ifs_ >> rotation[i];
-      }
-      for (int i = 0; i < 4; ++i){
+
+      for (int i = 0; i < 3; ++i){
         ifs_ >> articulation[i];
       }
       for (int i = 0; i < 3; ++i){
         wrist_dh_params_[i] = articulation[i];
       }
-      ci::Quatf q(rotation[0], rotation[1], rotation[2], rotation[3]);
-      ci::Matrix44f rot = q;
+      //ci::Quatf q(rotation[0], rotation[1], rotation[2], rotation[3]);
+      cv::Mat rot_cv;
+      cv::Rodrigues(rotation, rot_cv);
+      //ci::Matrix44f rot = q;
       for (int r = 0; r < 3; ++r){
         for (int c = 0; c < 3; ++c){
-          shaft_pose_.at(r, c) = rot.at(r, c);
+          shaft_pose_.at(r, c) = rot_cv.at<float>(r, c);
         }
       }
-
       shaft_pose_.setTranslate(translation);
       do_draw_ = true;
-
+      
       // update the list of previous poses for plotting trajectories.
       reference_frame_tracks_.push_back(shaft_pose_);
 
@@ -667,8 +659,7 @@ void SE3DaVinciPoseGrabber::GetModelPose(ci::Matrix44f &head, ci::Matrix44f &cla
     for (size_t i = 0; i < num_wrist_joints_; ++i){
       psm.jnt_pos[i] = wrist_dh_params_[i];
     }
-
-
+    
     if (target_joint_ == davinci::PSM1)
       buildKinematicChainPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
     else if (target_joint_ == davinci::PSM2)
@@ -731,6 +722,15 @@ bool QuaternionPoseGrabber::LoadPose(const bool update_as_new){
       }
       std::stringstream ss(line);
       
+      ci::Vec3f translation;
+      for (size_t col = 0; col < 3; ++col){
+        float val;
+        ss >> val;
+        translation[col] = val;
+      }
+
+      shaft_pose_.setTranslate(translation);
+
       ci::Vec4f quats;
       for (size_t col = 0; col < 4; ++col){
         float val;
@@ -740,14 +740,7 @@ bool QuaternionPoseGrabber::LoadPose(const bool update_as_new){
 
       shaft_pose_ = ci::Quatf(quats[0], quats[1], quats[2], quats[3]);
 
-      ci::Vec3f translation;
-      for (size_t col = 0; col < 3; ++col){
-        float val;
-        ss >> val;
-        translation[col] = val;
-      }
-
-      shaft_pose_.setTranslate(translation);
+      
 
       //update the reference list of old tracks for drawing trajectories
       reference_frame_tracks_.push_back(shaft_pose_);
