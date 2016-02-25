@@ -985,16 +985,18 @@ void vizApp::drawTargets(){
   
   for (size_t i = 0; i < trackables_.size(); ++i){
 
-    //if (m != moveable_camera_->GetPose() * trackables_[i]->GetPose()){
+    //if (m != trackables_[i]->GetPose()){
 
     //  //ci::app::console() << "Pose = \n" << moveable_camera_->GetPose().inverted() * trackables_[i]->GetPose();
-    //  m = moveable_camera_->GetPose() * trackables_[i]->GetPose();
+    m = trackables_[i]->GetPose();
 
-    //  ci::Matrix33f m33 = m.subMatrix33(0,0);
-    //  ci::Quatf q = m33;
-    //  ci::app::console() << "Pitch = " << q.getPitch() << std::endl;
-    //  ci::app::console() << "Roll = " << q.getRoll() << std::endl;
-    //  ci::app::console() << "Yaw = " << q.getYaw() << std::endl;
+    ci::Matrix33f m33 = m.subMatrix33(0, 0);
+    ci::Quatf q = m33;
+    ci::app::console() << "Pitch = " << q.getPitch() << std::endl;
+    ci::app::console() << "Roll = " << q.getRoll() << std::endl;
+    ci::app::console() << "Yaw = " << q.getYaw() << std::endl;
+
+    q = ci::Quatf(q.getPitch(), q.getYaw(), q.getRoll());
 
 
     //}
