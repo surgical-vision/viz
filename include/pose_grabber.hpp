@@ -183,6 +183,8 @@ namespace viz {
 
   public:
 
+
+
     /**
     * Construct a base class da vinci pose grabber. This really just loads the model.
     * @param[in] reader The configuration file.
@@ -202,6 +204,10 @@ namespace viz {
     virtual void Draw() const { model_.Draw(); }
 
   protected:
+    virtual void SetOffsetsToNull() = 0;
+
+    virtual void SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets) = 0;
+
 
     /**
     * Possibly not needed?
@@ -225,21 +231,6 @@ namespace viz {
 
   public:
 
-    void SetOffsetsToNull() {
-
-      for (size_t i = 0; i < base_offsets_.size(); ++i){
-
-        base_offsets_[i] = 0;
-
-      }
-
-      for (size_t i = 0; i < arm_offsets_.size(); ++i){
-
-        arm_offsets_[i] = 0;
-
-      }
-
-    }
 
     /**
     * Construct a DH parameter da Vinci manipulator from a configuration file.
@@ -280,9 +271,13 @@ namespace viz {
 
     virtual ~DHDaVinciPoseGrabber() { if (base_ifs_.is_open()) base_ifs_.close(); if (arm_ifs_.is_open()) arm_ifs_.close(); if (base_ofs_.is_open()) base_ofs_.close(); if (arm_ofs_.is_open()) arm_ofs_.close(); if (se3_ofs_.is_open()) se3_ofs_.close(); }
 
-	void DrawBody();
-	void DrawHead();
-	void GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right);
+    void DrawBody();
+    void DrawHead();
+    void GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right);
+
+
+    virtual void SetOffsetsToNull() override;
+
 
   protected:
 
@@ -291,7 +286,7 @@ namespace viz {
     * @param[in] base_offsets The default base offsets to start with (if we've computed them before and want to start playing around with a better estimate.
     * @param[in] arm_offsets The default arm offsets to start with.
     */
-    void SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets);
+    virtual void SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets) override;
 
     /**
     * Read the DH values from the files and store them in the vectors.
@@ -364,9 +359,30 @@ namespace viz {
     void DrawBody();
     void DrawHead();
     void GetModelPose(ci::Matrix44f &head, ci::Matrix44f &clasper_left, ci::Matrix44f &clasper_right);
+    
+    /**
+    * Read the DH values from the files and store them in the vectors.
+    * @param[in] base_offsets The default base offsets to start with (if we've computed them before and want to start playing around with a better estimate.
+    * @param[in] arm_offsets The default arm offsets to start with.
+    */
+    virtual void SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets) override;
 
 
   protected:
+
+    virtual void SetOffsetsToNull() override;
+    
+    float x_rotation_offset_;
+    float y_rotation_offset_;
+    float z_rotation_offset_;
+    float x_translation_offset_;
+    float y_translation_offset_;
+    float z_translation_offset_;
+
+    ci::Quatf rotation_;
+    ci::Vec3f translation_;
+
+    std::vector<float> wrist_offsets_;
 
     std::size_t num_wrist_joints_; /**< Number of joints in the wrist of the instrument. */
     

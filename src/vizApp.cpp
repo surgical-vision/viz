@@ -1077,8 +1077,8 @@ void vizApp::loadTrackable(const std::string &filepath, const std::string &outpu
   ConfigReader reader(filepath);
 
   try{
-    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
-    return;
+    //trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
+    //return;
   }
   catch (std::runtime_error){
   

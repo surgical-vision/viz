@@ -389,23 +389,14 @@ bool DHDaVinciPoseGrabber::ReadDHFromFiles(std::vector<double> &psm_base_joints,
       double x;
       arm_ifs_ >> x;
       psm_arm_joints[i] = x;
-
-      ci::app::console() << x << ", ";
-
     }
-
-    ci::app::console() << "\n";
 
     for (int i = 0; i < num_base_joints_; ++i){
       double x;
       base_ifs_ >> x;
       psm_base_joints[i] = x;
 
-      ci::app::console() << x << ", ";
-
     }
-
-    ci::app::console() << std::endl;
 
   }
   catch (std::ifstream::failure){
@@ -450,6 +441,22 @@ void DHDaVinciPoseGrabber::WritePoseToStream()  {
 
 }
 
+void DHDaVinciPoseGrabber::SetOffsetsToNull() {
+
+  for (size_t i = 0; i < base_offsets_.size(); ++i){
+
+    base_offsets_[i] = 0;
+
+  }
+
+  for (size_t i = 0; i < arm_offsets_.size(); ++i){
+
+    arm_offsets_[i] = 0;
+
+  }
+
+}
+
 void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  {
 
   if (!se3_ofs_.is_open()) {
@@ -483,6 +490,75 @@ void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  
 
 }
 
+void SE3DaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets){
+
+  //if (base_offsets.size() != 6 || arm_offsets.size() != 3) {
+  //  ci::app::console() << "Error, base offsets size should be 6 and arm offsets size should be 3\n" << std::endl;
+  //  throw std::runtime_error("");
+  //}
+
+  std::stringstream ss;
+  std::stringstream ss2;
+
+  param_modifier_->addText("", "label=`Edit the 6 DOF pose joints`");
+
+  ss << base_offsets;
+  ss >> x_rotation_offset_;
+  param_modifier_->addParam("X rotation offset", &x_rotation_offset_, "min=-10 max=10 step= 0.01 keyIncr=r keyDecr=R");
+  
+
+  ss << base_offsets;
+  ss >> y_rotation_offset_;
+  param_modifier_->addParam("Y rotation offset", &y_rotation_offset_, "min=-10 max=10 step= 0.01 keyIncr=p keyDecr=P");
+
+  ss << base_offsets;
+  ss >> z_rotation_offset_;
+  param_modifier_->addParam("Z rotation offset", &z_rotation_offset_, "min=-10 max=10 step= 0.01 keyIncr=y keyDecr=Y");
+
+  ss << base_offsets;
+  ss >> x_translation_offset_;
+  param_modifier_->addParam("X translation offset", &x_translation_offset_, "min=-10 max=10 step= 0.001 keyIncr=x keyDecr=X");
+
+  ss << base_offsets;
+  ss >> y_translation_offset_;
+  param_modifier_->addParam("Y translation offset", &y_translation_offset_, "min=-10 max=10 step= 0.001 keyIncr=y keyDecr=Y");
+
+  ss << base_offsets;
+  ss >> z_translation_offset_;
+  param_modifier_->addParam("Z translation offset", &z_translation_offset_, "min=-10 max=10 step= 0.001 keyIncr=z keyDecr=Z");
+
+  param_modifier_->addSeparator();
+  param_modifier_->addText("", "label=`Edit the wrist joints`");
+
+  ss.clear();
+  ss << arm_offsets;
+  for (size_t i = 0; i < wrist_offsets_.size(); ++i){
+    ss >> wrist_offsets_[i];
+    std::stringstream ss2;
+    ss2 << "Joint " << i;
+    if (i < 3)
+      param_modifier_->addParam(ss2.str(), &(wrist_offsets_[i]), "min=-10 max=10 step= 0.0001 keyIncr=z keyDecr=Z");
+    else
+      param_modifier_->addParam(ss2.str(), &(wrist_offsets_[i]), "min=-10 max=10 step= 0.001 keyIncr=z keyDecr=Z");
+  }
+
+}
+
+void SE3DaVinciPoseGrabber::SetOffsetsToNull() {
+
+  x_rotation_offset_ = 0.0f;
+  y_rotation_offset_ = 0.0f;
+  z_rotation_offset_ = 0.0f;
+  x_translation_offset_ = 0.0f;
+  y_translation_offset_ = 0.0f;
+  z_translation_offset_ = 0.0f;
+
+  for (int i = 0; i < num_wrist_joints_; ++i){
+    wrist_offsets_[i] = 0.0f;
+  }
+
+}
+
 SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const std::string &output_dir, bool check_type) : BaseDaVinciPoseGrabber(reader, output_dir) {
 
   if (check_type){
@@ -506,8 +582,116 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
   num_wrist_joints_ = 3; //should this load from config file?
 
   wrist_dh_params_ = std::vector<double>(num_wrist_joints_, 0.0);
+  wrist_offsets_ = std::vector<float>(num_wrist_joints_, 0.0);
+
+  try{
+    SetupOffsets(reader.get_element("base-offset"), reader.get_element("arm-offset"));
+  }
+  catch (std::runtime_error &){
+
+  }
 
 }
+
+inline ci::Vec3f EulersFromQuaternion(const ci::Quatf &q){
+
+  float roll = ci::math<float>::atan2(2.0f * (q.v.y * q.v.z + q.w * q.v.x), 1 - 2*(q.v.x * q.v.x + q.v.y*q.v.y));
+  float pitch = ci::math<float>::asin(2.0f * (q.w * q.v.y - q.v.x * q.v.z));
+  float yaw = ci::math<float>::atan2(2.0f * (q.v.x * q.v.y + q.w * q.v.z), 1 - 2*(q.v.y * q.v.y + q.v.z * q.v.z));
+  return ci::Vec3f(roll, pitch, yaw);
+}
+
+inline ci::Matrix44f MatrixFromClassicEulers(float xRotation, float yRotation, float zRotation){
+
+
+}
+
+inline ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation){
+
+  float cosx = ci::math<float>::cos(xRotation);
+  float cosy = ci::math<float>::cos(yRotation);
+  float cosz = ci::math<float>::cos(zRotation);
+  float sinx = ci::math<float>::sin(xRotation);
+  float siny = ci::math<float>::sin(yRotation);
+  float sinz = ci::math<float>::sin(zRotation);
+
+  ci::Matrix33f xRotationMatrix; xRotationMatrix.setToIdentity();
+  ci::Matrix33f yRotationMatrix; yRotationMatrix.setToIdentity();
+  ci::Matrix33f zRotationMatrix; zRotationMatrix.setToIdentity();
+
+  xRotationMatrix.at(1, 1) = xRotationMatrix.at(2, 2) = cosx;
+  xRotationMatrix.at(1, 2) = -sinx;
+  xRotationMatrix.at(2, 1) = sinx;
+
+  yRotationMatrix.at(0, 0) = yRotationMatrix.at(2, 2) = cosy;
+  yRotationMatrix.at(0, 2) = siny;
+  yRotationMatrix.at(2, 0) = -siny;
+
+  zRotationMatrix.at(0, 0) = zRotationMatrix.at(1, 1) = cosz;
+  zRotationMatrix.at(0, 1) = -sinz;
+  zRotationMatrix.at(1, 0) = sinz;
+
+  //ci::Matrix33f r = zRotationMatrix * yRotationMatrix * xRotationMatrix;
+
+  ci::Matrix33f r = xRotationMatrix * yRotationMatrix * zRotationMatrix;
+
+  ci::Matrix44f rr = r;
+  rr.at(3, 3) = 1.0f;
+  return rr;
+
+  ci::Matrix44f m;
+  
+  // Tait-Bryan angles X_1, Y_2, Z_3
+  //m.at(0, 0) = cosy * cosz;
+  //m.at(0, 1) = -cosy * sinz;
+  //m.at(0, 2) = siny;
+  //m.at(1, 0) = cosx * sinz + cosz * sinx * siny;
+  //m.at(1, 1) = cosx * cosz - sinx * siny * sinz;
+  //m.at(1, 2) = -cosy * sinx;
+  //m.at(2, 0) = sinx * sinz - cosx * cosz * siny;
+  //m.at(2, 1) = cosz * sinx + cosx * siny * sinz;
+  //m.at(2, 2) = cosx * cosy;
+
+  m.at(0, 0) = cosy * cosz;
+  m.at(0, 1) = sinx * siny * cosz - cosx * sinz;
+  m.at(0, 2) = sinx * sinz + cosx * siny * cosz;
+  m.at(1, 0) = cosy * sinz;
+  m.at(1, 1) = cosx * cosz + sinx * siny * sinz;
+  m.at(1, 2) = cosx * siny * sinz - sinx * cosz;
+  m.at(2, 0) = -siny;
+  m.at(2, 1) = sinx * cosy;
+  m.at(2, 2) = cosx * cosy;
+
+  return m;
+
+}
+
+inline ci::Quatf QuaternionFromEulers(float xRotation, float yRotation, float zRotation){
+
+  zRotation *= 0.5f;
+  yRotation *= 0.5f;
+  xRotation *= 0.5f;
+
+  // get sines and cosines of half angles
+  float Cx = ci::math<float>::cos(xRotation);
+  float Sx = ci::math<float>::sin(xRotation);
+
+  float Cy = ci::math<float>::cos(yRotation);
+  float Sy = ci::math<float>::sin(yRotation);
+                            
+  float Cz = ci::math<float>::cos(zRotation);
+  float Sz = ci::math<float>::sin(zRotation);
+
+  ci::Quatf r;
+  // multiply it out
+  r.w = Cx*Cy*Cz + Sx*Sy*Sz;
+  r.v.x = Sx*Cy*Cz - Cx*Sy*Sz;
+  r.v.y = Cx*Sy*Cz + Sx*Cy*Sz;
+  r.v.z = Cx*Cy*Sz - Sx*Sy*Cz;
+
+  return r.normalized();
+}
+
 
 bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
   
@@ -515,21 +699,24 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
 
   assert(num_wrist_joints_ == wrist_dh_params_.size());
 
+  static ci::Matrix44f current_user_supplied_offset;
+
   if (update_as_new){
 
     try{
       std::string line;
       int row = 0;
-      cv::Vec3f rotation;
-      ci::Vec3f translation;
+
       ci::Vec3f articulation;
       //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
-      for (int i = 0; i < 3; ++i){
-        ifs_ >> rotation[i];
-      }
+
 
       for (int i = 0; i < 3; ++i){
-        ifs_ >> translation[i];
+        ifs_ >> translation_[i];
+      }
+
+      for (int i = 0; i < 4; ++i){
+        ifs_ >> rotation_[i];
       }
 
       for (int i = 0; i < 3; ++i){
@@ -538,20 +725,8 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
       for (int i = 0; i < 3; ++i){
         wrist_dh_params_[i] = articulation[i];
       }
-      //ci::Quatf q(rotation[0], rotation[1], rotation[2], rotation[3]);
-      cv::Mat rot_cv;
-      cv::Rodrigues(rotation, rot_cv);
-      //ci::Matrix44f rot = q;
-      for (int r = 0; r < 3; ++r){
-        for (int c = 0; c < 3; ++c){
-          shaft_pose_.at(r, c) = rot_cv.at<float>(r, c);
-        }
-      }
-      shaft_pose_.setTranslate(translation);
-      do_draw_ = true;
-      
-      // update the list of previous poses for plotting trajectories.
-      reference_frame_tracks_.push_back(shaft_pose_);
+
+      shaft_pose_ = rotation_ * current_user_supplied_offset;
 
     }
     catch (std::ifstream::failure e){
@@ -559,15 +734,34 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
       do_draw_ = false;
       return false;
     }
-
   }
-  //if (do_draw_ == false) return false;
+  static float x_rotation_offsetQ = x_rotation_offset_;
+  static float y_rotation_offsetQ = y_rotation_offset_;
+  static float z_rotation_offsetQ = z_rotation_offset_;
+
+  auto offset = MatrixFromIntrinsicEulers(x_rotation_offset_ - x_rotation_offsetQ, y_rotation_offset_ - y_rotation_offsetQ, z_rotation_offset_ - z_rotation_offsetQ);
+
+  x_rotation_offsetQ = x_rotation_offset_;
+  y_rotation_offsetQ = y_rotation_offset_;
+  z_rotation_offsetQ = z_rotation_offset_;
+
+  current_user_supplied_offset = current_user_supplied_offset * offset;
+
+  shaft_pose_ = shaft_pose_ * offset;
+
+  ci::app::console() << "Shaft pose = " << shaft_pose_ << std::endl;
+
+  shaft_pose_.setTranslate(translation_ + ci::Vec3f(x_translation_offset_, y_translation_offset_, z_translation_offset_));
+  do_draw_ = true;
+
+  // update the list of previous poses for plotting trajectories.
+  reference_frame_tracks_.push_back(shaft_pose_);
 
   model_.Shaft().transform_ = shaft_pose_;
 
   viz::davinci::PSMData psm;
   for (size_t i = 0; i < num_wrist_joints_; ++i){
-    psm.jnt_pos[i] = wrist_dh_params_[i];
+    psm.jnt_pos[i] = wrist_dh_params_[i] + wrist_offsets_[i];
   }
 
   if (target_joint_ == davinci::PSM1)
