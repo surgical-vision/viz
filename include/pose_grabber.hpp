@@ -379,6 +379,12 @@ namespace viz {
     float y_translation_offset_;
     float z_translation_offset_;
 
+    float entire_x_rotation_offset_;
+    float entire_y_rotation_offset_;
+    float entire_z_rotation_offset_;
+
+    ci::Matrix44f current_user_supplied_offset_;
+
     ci::Quatf rotation_;
     ci::Vec3f translation_;
 

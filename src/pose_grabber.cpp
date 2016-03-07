@@ -606,6 +606,30 @@ inline ci::Matrix44f MatrixFromClassicEulers(float xRotation, float yRotation, f
 
 }
 
+void QuaternionFromAngleAxis(ci::Vec3f angle, ci::Matrix33f axis, ci::Quatf *qs){
+
+  int sig = 3;
+  cv::Size six(3, 3);
+
+
+}
+
+inline ci::Quatf QuaternionFromXYZIntrinsicEulers2(float xRotation, float yRotation, float zRotation){
+
+  ci::Matrix33f axis; //set to identity
+  ci::Quatf q0[3]; //from angle axis
+  
+  ci::Quatf qout = q0[0]; //
+  for (int i = 1; i < 3; ++i){
+    qout = q0[i] * qout;
+  }
+  
+  if (qout.w < 0) qout *= -1;
+
+  return qout;
+
+}
+
 inline ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation){
 
   float cosx = ci::math<float>::cos(xRotation);
@@ -631,8 +655,10 @@ inline ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation,
   zRotationMatrix.at(0, 1) = -sinz;
   zRotationMatrix.at(1, 0) = sinz;
 
+  //xyz
   //ci::Matrix33f r = zRotationMatrix * yRotationMatrix * xRotationMatrix;
 
+  //zyx
   ci::Matrix33f r = xRotationMatrix * yRotationMatrix * zRotationMatrix;
 
   ci::Matrix44f rr = r;
@@ -693,13 +719,57 @@ inline ci::Quatf QuaternionFromEulers(float xRotation, float yRotation, float zR
 }
 
 
+ci::Vec3f GetXYZEulersFromQuaternion(const ci::Quatf &quaternion){
+
+  ci::Vec3f angles;
+
+  /*
+  angles(1,iel) = atan2(2.*(q(iel).e(2).*q(iel).e(1)+ ...
+                     q(iel).e(4).*q(iel).e(3)),(q(iel).e(1).^2- ...
+                        q(iel).e(2).^2-q(iel).e(3).^2+q(iel).e(4).^2));
+                    angles(2,iel) = asin(2.*(q(iel).e(3).*q(iel).e(1)- ...
+                        q(iel).e(2).*q(iel).e(4)));
+                    angles(3,iel) = atan2(2.*(q(iel).e(2).*q(iel).e(3)+ ...
+                        q(iel).e(4).*q(iel).e(1)),(q(iel).e(1).^2+ ...
+                        q(iel).e(2).^2-q(iel).e(3).^2-q(iel).e(4).^2));  
+  */
+
+  angles[0] = atan2(2 * (quaternion.v.x*quaternion.w + quaternion.v.z*quaternion.v.y), (quaternion.w * quaternion.w - quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y + quaternion.v.z * quaternion.v.z));
+  angles[1] = asin(2 * (quaternion.v.y*quaternion.w - quaternion.v.x*quaternion.v.z));
+  angles[2] = atan2(2 * (quaternion.v.x*quaternion.v.y + quaternion.v.z*quaternion.w), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
+  
+  return angles;
+
+}
+
+
+ci::Vec3f GetZYXEulersFromQuaternion(const ci::Quatf &quaternion){
+
+  ci::Vec3f angles;
+
+  //angles(1,iel) = atan2(2.*(q(iel).e(4).*q(iel).e(1)- ...
+  //q(iel).e(2).*q(iel).e(3)), (q(iel).e(1). ^ 2 + ...
+  //  q(iel).e(2). ^ 2 - q(iel).e(3). ^ 2 - q(iel).e(4). ^ 2));
+  //  angles(2, iel) = asin(2.*(q(iel).e(2).*q(iel).e(4) + ...
+  //    q(iel).e(3).*q(iel).e(1)));
+  //  angles(3, iel) = atan2(2.*(q(iel).e(2).*q(iel).e(1) - ...
+  //    q(iel).e(3).*q(iel).e(4)), (q(iel).e(1). ^ 2 - ...
+  //   q(iel).e(2). ^ 2 - q(iel).e(3). ^ 2 + q(iel).e(4). ^ 2));
+
+  angles[0] = atan2(2 * (quaternion.v.z*quaternion.w - quaternion.v.x*quaternion.v.y), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
+  angles[1] = asin(2 * (quaternion.v.x*quaternion.v.z + quaternion.v.y*quaternion.w));
+  angles[2] = atan2(2 * (quaternion.v.x*quaternion.w - quaternion.v.y*quaternion.v.z), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
+
+  return angles;
+
+}
+
+
 bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
   
   do_draw_ = false; //set to true only if we read a 'good' pose
 
   assert(num_wrist_joints_ == wrist_dh_params_.size());
-
-  static ci::Matrix44f current_user_supplied_offset;
 
   if (update_as_new){
 
@@ -707,7 +777,7 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
       std::string line;
       int row = 0;
 
-      ci::Vec3f articulation;
+      ci::Vec4f articulation;
       //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
 
 
@@ -719,14 +789,33 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
         ifs_ >> rotation_[i];
       }
 
-      for (int i = 0; i < 3; ++i){
+      for (int i = 0; i < 4; ++i){
         ifs_ >> articulation[i];
       }
       for (int i = 0; i < 3; ++i){
         wrist_dh_params_[i] = articulation[i];
       }
 
-      shaft_pose_ = rotation_ * current_user_supplied_offset;
+      ci::Quatf backup_q = rotation_;
+      //float roll = rotation_.getRoll();
+      //float pitch = rotation_.getPitch();
+      //float yaw = rotation_.getYaw();
+
+      ci::Vec3f eulers = GetZYXEulersFromQuaternion(rotation_);
+      static float increment = 0.05;
+      increment = increment + 0.05;
+
+      eulers[2] += increment;
+
+      ci::Matrix44f qqnew = MatrixFromIntrinsicEulers(eulers[0], eulers[1], eulers[2]);
+
+      //ci::Quatf qq(eulers[2], eulers[1], eulers[0] + increment);
+
+      rotation_ = qqnew;
+
+      ci::Matrix44f rotation_m = rotation_;
+      shaft_pose_ = rotation_m; *current_user_supplied_offset_;
+
 
     }
     catch (std::ifstream::failure e){
@@ -735,22 +824,16 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
       return false;
     }
   }
-  static float x_rotation_offsetQ = x_rotation_offset_;
-  static float y_rotation_offsetQ = y_rotation_offset_;
-  static float z_rotation_offsetQ = z_rotation_offset_;
+  
+  auto offset = MatrixFromIntrinsicEulers(x_rotation_offset_ - entire_x_rotation_offset_, y_rotation_offset_ - entire_y_rotation_offset_, z_rotation_offset_ - entire_z_rotation_offset_);
 
-  auto offset = MatrixFromIntrinsicEulers(x_rotation_offset_ - x_rotation_offsetQ, y_rotation_offset_ - y_rotation_offsetQ, z_rotation_offset_ - z_rotation_offsetQ);
+  entire_x_rotation_offset_ = x_rotation_offset_;
+  entire_y_rotation_offset_ = y_rotation_offset_;
+  entire_z_rotation_offset_ = z_rotation_offset_;
 
-  x_rotation_offsetQ = x_rotation_offset_;
-  y_rotation_offsetQ = y_rotation_offset_;
-  z_rotation_offsetQ = z_rotation_offset_;
-
-  current_user_supplied_offset = current_user_supplied_offset * offset;
-
+  current_user_supplied_offset_ = current_user_supplied_offset_ * offset;
   shaft_pose_ = shaft_pose_ * offset;
-
-  ci::app::console() << "Shaft pose = " << shaft_pose_ << std::endl;
-
+  
   shaft_pose_.setTranslate(translation_ + ci::Vec3f(x_translation_offset_, y_translation_offset_, z_translation_offset_));
   do_draw_ = true;
 
