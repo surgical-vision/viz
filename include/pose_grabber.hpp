@@ -370,6 +370,17 @@ namespace viz {
 
   protected:
 
+    enum LoadType {QUATERNION, MATRIX, EULER};
+    LoadType rotation_type_;
+
+    void LoadPoseAsQuaternion();
+    void LoadPoseAsMatrix();
+
+    //assume intrinsic eulers and x-y-z order
+    void LoadPoseAsEulerAngles();
+    ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation) const;
+    ci::Vec3f GetZYXEulersFromQuaternion(const ci::Quatf &quaternion) const;
+    
     virtual void SetOffsetsToNull() override;
     
     float x_rotation_offset_;

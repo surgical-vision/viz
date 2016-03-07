@@ -57,7 +57,7 @@ void vizApp::setupFromConfig(const std::string &path){
 
       output_dir = reader.get_element("output-dir");
       if (!boost::filesystem::is_directory(output_dir))
-        throw std::runtime_error("");
+        boost::filesystem::create_directories(output_dir);
 
     }
 

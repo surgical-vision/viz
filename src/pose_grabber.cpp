@@ -566,6 +566,12 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
     checkSelfName(reader.get_element("name"));
   }
 
+  std::string rotation_type = reader.get_element("rotation-type");
+  if (rotation_type == "euler") rotation_type_ = LoadType::EULER;
+  else if (rotation_type == "quaternion") rotation_type_ = LoadType::QUATERNION;
+  else if (rotation_type == "matrix") rotation_type_ = LoadType::MATRIX;
+  else throw std::runtime_error("");
+
   if (reader.get_element("joint") == "PSM1")
     target_joint_ = davinci::DaVinciJoint::PSM1;
   else if (reader.get_element("joint") == "PSM2")
@@ -593,44 +599,16 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
 
 }
 
-inline ci::Vec3f EulersFromQuaternion(const ci::Quatf &q){
-
-  float roll = ci::math<float>::atan2(2.0f * (q.v.y * q.v.z + q.w * q.v.x), 1 - 2*(q.v.x * q.v.x + q.v.y*q.v.y));
-  float pitch = ci::math<float>::asin(2.0f * (q.w * q.v.y - q.v.x * q.v.z));
-  float yaw = ci::math<float>::atan2(2.0f * (q.v.x * q.v.y + q.w * q.v.z), 1 - 2*(q.v.y * q.v.y + q.v.z * q.v.z));
-  return ci::Vec3f(roll, pitch, yaw);
-}
-
-inline ci::Matrix44f MatrixFromClassicEulers(float xRotation, float yRotation, float zRotation){
+//inline ci::Vec3f EulersFromQuaternion(const ci::Quatf &q){
+//
+//  float roll = ci::math<float>::atan2(2.0f * (q.v.y * q.v.z + q.w * q.v.x), 1 - 2*(q.v.x * q.v.x + q.v.y*q.v.y));
+//  float pitch = ci::math<float>::asin(2.0f * (q.w * q.v.y - q.v.x * q.v.z));
+//  float yaw = ci::math<float>::atan2(2.0f * (q.v.x * q.v.y + q.w * q.v.z), 1 - 2*(q.v.y * q.v.y + q.v.z * q.v.z));
+//  return ci::Vec3f(roll, pitch, yaw);
+//}
 
 
-}
-
-void QuaternionFromAngleAxis(ci::Vec3f angle, ci::Matrix33f axis, ci::Quatf *qs){
-
-  int sig = 3;
-  cv::Size six(3, 3);
-
-
-}
-
-inline ci::Quatf QuaternionFromXYZIntrinsicEulers2(float xRotation, float yRotation, float zRotation){
-
-  ci::Matrix33f axis; //set to identity
-  ci::Quatf q0[3]; //from angle axis
-  
-  ci::Quatf qout = q0[0]; //
-  for (int i = 1; i < 3; ++i){
-    qout = q0[i] * qout;
-  }
-  
-  if (qout.w < 0) qout *= -1;
-
-  return qout;
-
-}
-
-inline ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation){
+ci::Matrix44f SE3DaVinciPoseGrabber::MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation) const {
 
   float cosx = ci::math<float>::cos(xRotation);
   float cosy = ci::math<float>::cos(yRotation);
@@ -665,33 +643,9 @@ inline ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation,
   rr.at(3, 3) = 1.0f;
   return rr;
 
-  ci::Matrix44f m;
-  
-  // Tait-Bryan angles X_1, Y_2, Z_3
-  //m.at(0, 0) = cosy * cosz;
-  //m.at(0, 1) = -cosy * sinz;
-  //m.at(0, 2) = siny;
-  //m.at(1, 0) = cosx * sinz + cosz * sinx * siny;
-  //m.at(1, 1) = cosx * cosz - sinx * siny * sinz;
-  //m.at(1, 2) = -cosy * sinx;
-  //m.at(2, 0) = sinx * sinz - cosx * cosz * siny;
-  //m.at(2, 1) = cosz * sinx + cosx * siny * sinz;
-  //m.at(2, 2) = cosx * cosy;
-
-  m.at(0, 0) = cosy * cosz;
-  m.at(0, 1) = sinx * siny * cosz - cosx * sinz;
-  m.at(0, 2) = sinx * sinz + cosx * siny * cosz;
-  m.at(1, 0) = cosy * sinz;
-  m.at(1, 1) = cosx * cosz + sinx * siny * sinz;
-  m.at(1, 2) = cosx * siny * sinz - sinx * cosz;
-  m.at(2, 0) = -siny;
-  m.at(2, 1) = sinx * cosy;
-  m.at(2, 2) = cosx * cosy;
-
-  return m;
-
 }
 
+/*
 inline ci::Quatf QuaternionFromEulers(float xRotation, float yRotation, float zRotation){
 
   zRotation *= 0.5f;
@@ -717,33 +671,34 @@ inline ci::Quatf QuaternionFromEulers(float xRotation, float yRotation, float zR
 
   return r.normalized();
 }
+*
+
+//ci::Vec3f GetXYZEulersFromQuaternion(const ci::Quatf &quaternion){
+//
+//  ci::Vec3f angles;
+//
+//  /*
+//  angles(1,iel) = atan2(2.*(q(iel).e(2).*q(iel).e(1)+ ...
+//                     q(iel).e(4).*q(iel).e(3)),(q(iel).e(1).^2- ...
+//                        q(iel).e(2).^2-q(iel).e(3).^2+q(iel).e(4).^2));
+//                    angles(2,iel) = asin(2.*(q(iel).e(3).*q(iel).e(1)- ...
+//                        q(iel).e(2).*q(iel).e(4)));
+//                    angles(3,iel) = atan2(2.*(q(iel).e(2).*q(iel).e(3)+ ...
+//                        q(iel).e(4).*q(iel).e(1)),(q(iel).e(1).^2+ ...
+//                        q(iel).e(2).^2-q(iel).e(3).^2-q(iel).e(4).^2));  
+//  */
+
+//
+//  angles[0] = atan2(2 * (quaternion.v.x*quaternion.w + quaternion.v.z*quaternion.v.y), (quaternion.w * quaternion.w - quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y + quaternion.v.z * quaternion.v.z));
+//  angles[1] = asin(2 * (quaternion.v.y*quaternion.w - quaternion.v.x*quaternion.v.z));
+//  angles[2] = atan2(2 * (quaternion.v.x*quaternion.v.y + quaternion.v.z*quaternion.w), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
+//  
+//  return angles;
+//
+//}
 
 
-ci::Vec3f GetXYZEulersFromQuaternion(const ci::Quatf &quaternion){
-
-  ci::Vec3f angles;
-
-  /*
-  angles(1,iel) = atan2(2.*(q(iel).e(2).*q(iel).e(1)+ ...
-                     q(iel).e(4).*q(iel).e(3)),(q(iel).e(1).^2- ...
-                        q(iel).e(2).^2-q(iel).e(3).^2+q(iel).e(4).^2));
-                    angles(2,iel) = asin(2.*(q(iel).e(3).*q(iel).e(1)- ...
-                        q(iel).e(2).*q(iel).e(4)));
-                    angles(3,iel) = atan2(2.*(q(iel).e(2).*q(iel).e(3)+ ...
-                        q(iel).e(4).*q(iel).e(1)),(q(iel).e(1).^2+ ...
-                        q(iel).e(2).^2-q(iel).e(3).^2-q(iel).e(4).^2));  
-  */
-
-  angles[0] = atan2(2 * (quaternion.v.x*quaternion.w + quaternion.v.z*quaternion.v.y), (quaternion.w * quaternion.w - quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y + quaternion.v.z * quaternion.v.z));
-  angles[1] = asin(2 * (quaternion.v.y*quaternion.w - quaternion.v.x*quaternion.v.z));
-  angles[2] = atan2(2 * (quaternion.v.x*quaternion.v.y + quaternion.v.z*quaternion.w), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
-  
-  return angles;
-
-}
-
-
-ci::Vec3f GetZYXEulersFromQuaternion(const ci::Quatf &quaternion){
+ci::Vec3f SE3DaVinciPoseGrabber::GetZYXEulersFromQuaternion(const ci::Quatf &quaternion) const {
 
   ci::Vec3f angles;
 
@@ -764,6 +719,138 @@ ci::Vec3f GetZYXEulersFromQuaternion(const ci::Quatf &quaternion){
 
 }
 
+void SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
+
+  try{
+    std::string line;
+    int row = 0;
+
+    ci::Vec4f articulation;
+    //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
+
+
+    for (int i = 0; i < 3; ++i){
+      ifs_ >> translation_[i];
+    }
+
+    for (int i = 0; i < 4; ++i){
+      ifs_ >> rotation_[i];
+    }
+
+    for (int i = 0; i < 4; ++i){
+      ifs_ >> articulation[i];
+    }
+    for (int i = 0; i < 3; ++i){
+      wrist_dh_params_[i] = articulation[i];
+    }
+
+    //test for visualization
+
+    //ci::Vec3f eulers = GetZYXEulersFromQuaternion(rotation_);
+    //static float increment = 0.05;
+    //increment = increment + 0.05;
+
+    //eulers[2] += increment;
+
+    //ci::Matrix44f qqnew = MatrixFromIntrinsicEulers(3.141592 / 2 + 0 * eulers[0], 0 * eulers[1], eulers[2]);
+    //translation_[0] *= 0;
+    //translation_[1] *= 0;
+    
+    //rotation_ = qqnew;
+
+    ci::Matrix44f rotation_m = rotation_;
+    shaft_pose_ = rotation_m; *current_user_supplied_offset_;
+
+
+  }
+  catch (std::ifstream::failure e){
+    shaft_pose_.setToIdentity();
+    do_draw_ = false;
+    return;
+  }
+}
+
+
+void SE3DaVinciPoseGrabber::LoadPoseAsMatrix(){
+
+  throw std::runtime_error("");
+
+  try{
+    std::string line;
+    int row = 0;
+
+    ci::Vec4f articulation;
+    //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
+
+    ci::Matrix33f rotation_matrix;
+    ci::Vec3f translation;
+
+    for (int i = 0; i < 3; ++i){
+      std::string line;
+      std::getline(ifs_, line);
+
+
+    }
+
+ 
+    translation_ = translation;
+    rotation_ = rotation_matrix;
+
+    ci::Matrix44f rotation_m = rotation_;
+    shaft_pose_ = rotation_m *current_user_supplied_offset_;
+
+
+  }
+  catch (std::ifstream::failure e){
+    shaft_pose_.setToIdentity();
+    do_draw_ = false;
+    return;
+  }
+}
+
+void SE3DaVinciPoseGrabber::LoadPoseAsEulerAngles(){
+
+  try{
+    std::string line;
+    int row = 0;
+
+    ci::Vec3f eulers;
+    ci::Vec4f articulation;
+    //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
+
+
+    for (int i = 0; i < 3; ++i){
+      ifs_ >> translation_[i];
+    }
+
+    for (int i = 0; i < 3; ++i){
+      ifs_ >> eulers[i];
+    }
+
+    for (int i = 0; i < 4; ++i){
+      ifs_ >> articulation[i];
+    }
+    for (int i = 0; i < 3; ++i){
+      wrist_dh_params_[i] = articulation[i];
+    }
+    
+    ci::Matrix44f rotation_matrix = MatrixFromIntrinsicEulers(eulers[0], eulers[1], eulers[2]);
+    
+    rotation_ = rotation_matrix;
+
+    ci::Matrix44f rotation_m = rotation_;
+    shaft_pose_ = rotation_m *current_user_supplied_offset_;
+
+
+  }
+  catch (std::ifstream::failure e){
+    shaft_pose_.setToIdentity();
+    do_draw_ = false;
+    return;
+  }
+}
+
+
 
 bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
   
@@ -773,57 +860,19 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
 
   if (update_as_new){
 
-    try{
-      std::string line;
-      int row = 0;
+    if (rotation_type_ == LoadType::QUATERNION)
+      LoadPoseAsQuaternion();
 
-      ci::Vec4f articulation;
-      //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
+    else if (rotation_type_ == LoadType::EULER)
+      LoadPoseAsEulerAngles();
 
+    else if (rotation_type_ == LoadType::MATRIX)
+      LoadPoseAsMatrix();
 
-      for (int i = 0; i < 3; ++i){
-        ifs_ >> translation_[i];
-      }
-
-      for (int i = 0; i < 4; ++i){
-        ifs_ >> rotation_[i];
-      }
-
-      for (int i = 0; i < 4; ++i){
-        ifs_ >> articulation[i];
-      }
-      for (int i = 0; i < 3; ++i){
-        wrist_dh_params_[i] = articulation[i];
-      }
-
-      ci::Quatf backup_q = rotation_;
-      //float roll = rotation_.getRoll();
-      //float pitch = rotation_.getPitch();
-      //float yaw = rotation_.getYaw();
-
-      ci::Vec3f eulers = GetZYXEulersFromQuaternion(rotation_);
-      static float increment = 0.05;
-      increment = increment + 0.05;
-
-      eulers[2] += increment;
-
-      ci::Matrix44f qqnew = MatrixFromIntrinsicEulers(eulers[0], eulers[1], eulers[2]);
-
-      //ci::Quatf qq(eulers[2], eulers[1], eulers[0] + increment);
-
-      rotation_ = qqnew;
-
-      ci::Matrix44f rotation_m = rotation_;
-      shaft_pose_ = rotation_m; *current_user_supplied_offset_;
-
-
-    }
-    catch (std::ifstream::failure e){
-      shaft_pose_.setToIdentity();
-      do_draw_ = false;
+    else
       return false;
-    }
   }
+
   
   auto offset = MatrixFromIntrinsicEulers(x_rotation_offset_ - entire_x_rotation_offset_, y_rotation_offset_ - entire_y_rotation_offset_, z_rotation_offset_ - entire_z_rotation_offset_);
 
