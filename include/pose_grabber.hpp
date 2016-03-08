@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "davinci.hpp"
 #include "config_reader.hpp"
 #include "model.hpp"
+#include "camera.hpp"
 
 namespace viz {
 
@@ -368,6 +369,9 @@ namespace viz {
     virtual void SetupOffsets(const std::string &base_offsets, const std::string &arm_offsets) override;
 
 
+    void GetSubWindowCoordinates(const viz::Camera &camera, std::array<ci::Vec2i, 4> &rectangle, cv::Mat &affine_transform);
+
+
   protected:
 
     enum LoadType {QUATERNION, MATRIX, EULER};
@@ -378,9 +382,11 @@ namespace viz {
 
     //assume intrinsic eulers and x-y-z order
     void LoadPoseAsEulerAngles();
-    ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation) const;
+    ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation, const std::string &order) const;
     ci::Vec3f GetZYXEulersFromQuaternion(const ci::Quatf &quaternion) const;
-    
+    ci::Vec3f GetXZYEulersFromQuaternion(const ci::Quatf &quaternion) const;
+    ci::Matrix44f RemoveOutOfPlaneRotation(const ci::Matrix44f &pose) const; 
+
     virtual void SetOffsetsToNull() override;
     
     float x_rotation_offset_;

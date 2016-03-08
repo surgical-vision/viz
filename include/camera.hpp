@@ -89,6 +89,8 @@ namespace viz {
     */
     void TurnOffLight();
 
+    ci::Vec2f ProjectVertexToPixel(const ci::Vec3f point_in_camera_coordinates) const;
+
   protected:
 
     cv::Mat camera_matrix_; /**< The camera calibration matrix. */

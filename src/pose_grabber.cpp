@@ -63,6 +63,58 @@ BasePoseGrabber::BasePoseGrabber(const std::string &output_dir) : do_draw_(false
 
 }
 
+ci::Matrix44f SE3DaVinciPoseGrabber::RemoveOutOfPlaneRotation(const ci::Matrix44f &pose) const {
+
+  ci::Quatf rotation = pose.subMatrix33(0, 0);
+  ci::Vec3f eulers = GetXZYEulersFromQuaternion(rotation);
+  
+  eulers[1] = 0;
+  ci::Matrix44f m = MatrixFromIntrinsicEulers(eulers[0], 0, 0, "xzy");
+  m.setTranslate(pose.getTranslate());
+
+  return m;
+}
+
+void SE3DaVinciPoseGrabber::GetSubWindowCoordinates(const viz::Camera &camera, std::array<ci::Vec2i, 4> &rectangle, cv::Mat &affine_transform) {
+
+  const ci::Matrix44f pose = GetPose();
+  ci::Quatf rotation = pose.subMatrix33(0, 0);
+  ci::Vec3f eulers = GetXZYEulersFromQuaternion(rotation);
+  const float x_rotation = eulers[0];
+
+  const ci::Vec2i center_of_mass = camera.ProjectVertexToPixel(pose * ci::Vec3f(0, 0, 0));
+  const ci::Vec2i angle_of_shaft = camera.ProjectVertexToPixel(pose * ci::Vec3f(0, 0, 10));
+
+  ci::Vec2f local_vertical_axis = angle_of_shaft - center_of_mass; local_vertical_axis.normalize();
+  ci::Vec2f local_horizontal_axis = ci::Vec2f(local_vertical_axis[1], -local_vertical_axis[0]);
+
+  std::vector<ci::Matrix44f> transforms = model_.GetTransformSet();
+  ci::Matrix44f head_transform = transforms[2];
+
+  const ci::Vec2i center_of_head = camera.ProjectVertexToPixel(head_transform * ci::Vec3f(0, 0, 0));
+  float distance = std::sqrtf((center_of_mass.x - center_of_head.x)*(center_of_mass.x - center_of_head.x) + (center_of_mass.y - center_of_head.y)*(center_of_mass.y - center_of_head.y));
+
+  ci::Vec2i top_left = center_of_mass + (2.4 * distance*local_vertical_axis) + (2 * distance* local_horizontal_axis);
+  ci::Vec2i top_right = center_of_mass + (2.4 * distance*local_vertical_axis) - (2 * distance* local_horizontal_axis);
+
+  ci::Vec2i bottom_left = center_of_mass + (2 * distance* local_horizontal_axis);
+  ci::Vec2i bottom_right = center_of_mass - (2 * distance* local_horizontal_axis);
+
+  rectangle[0] = top_left;
+  rectangle[1] = top_right;
+  rectangle[2] = bottom_right;
+  rectangle[3] = bottom_left;
+
+  affine_transform = cv::Mat::eye(cv::Size(3, 2), CV_32FC1);
+  float angle = acos(std::abs(local_horizontal_axis[1])); //minus as we're going back from subwindow to window coords
+  affine_transform.at<float>(0, 0) = affine_transform.at<float>(0, 0) = cos(angle);
+  affine_transform.at<float>(0, 1) = -sin(angle);
+  affine_transform.at<float>(1, 0) = sin(angle);
+  affine_transform.at<float>(0, 2) = bottom_left[0];
+  affine_transform.at<float>(1, 2) = bottom_left[1];
+
+}
+
 void BasePoseGrabber::convertFromBouguetPose(const ci::Matrix44f &in_pose, ci::Matrix44f &out_pose){
 
   out_pose.setToIdentity();
@@ -599,16 +651,7 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
 
 }
 
-//inline ci::Vec3f EulersFromQuaternion(const ci::Quatf &q){
-//
-//  float roll = ci::math<float>::atan2(2.0f * (q.v.y * q.v.z + q.w * q.v.x), 1 - 2*(q.v.x * q.v.x + q.v.y*q.v.y));
-//  float pitch = ci::math<float>::asin(2.0f * (q.w * q.v.y - q.v.x * q.v.z));
-//  float yaw = ci::math<float>::atan2(2.0f * (q.v.x * q.v.y + q.w * q.v.z), 1 - 2*(q.v.y * q.v.y + q.v.z * q.v.z));
-//  return ci::Vec3f(roll, pitch, yaw);
-//}
-
-
-ci::Matrix44f SE3DaVinciPoseGrabber::MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation) const {
+ci::Matrix44f SE3DaVinciPoseGrabber::MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation, const std::string &order) const {
 
   float cosx = ci::math<float>::cos(xRotation);
   float cosy = ci::math<float>::cos(yRotation);
@@ -633,11 +676,19 @@ ci::Matrix44f SE3DaVinciPoseGrabber::MatrixFromIntrinsicEulers(float xRotation, 
   zRotationMatrix.at(0, 1) = -sinz;
   zRotationMatrix.at(1, 0) = sinz;
 
+  ci::Matrix33f r;
   //xyz
   //ci::Matrix33f r = zRotationMatrix * yRotationMatrix * xRotationMatrix;
 
   //zyx
-  ci::Matrix33f r = xRotationMatrix * yRotationMatrix * zRotationMatrix;
+  if (order == "zyx")
+    r = xRotationMatrix * yRotationMatrix * zRotationMatrix;
+  else if (order == "xyz")
+    r = zRotationMatrix * yRotationMatrix * xRotationMatrix;
+  else if (order == "xzy")
+    r = yRotationMatrix * zRotationMatrix * xRotationMatrix;
+  else
+    throw std::runtime_error("");
 
   ci::Matrix44f rr = r;
   rr.at(3, 3) = 1.0f;
@@ -697,6 +748,24 @@ inline ci::Quatf QuaternionFromEulers(float xRotation, float yRotation, float zR
 //
 //}
 
+ci::Vec3f SE3DaVinciPoseGrabber::GetXZYEulersFromQuaternion(const ci::Quatf &quaternion) const {
+
+  /*angles(1, iel) = atan2(2.*(q(iel).e(2).*q(iel).e(4) + ...
+    q(iel).e(3).*q(iel).e(1)), (q(iel).e(1). ^ 2 + ...
+    q(iel).e(2). ^ 2 - q(iel).e(3). ^ 2 - q(iel).e(4). ^ 2));
+    angles(2, iel) = asin(2.*(q(iel).e(4).*q(iel).e(1) - ...
+    q(iel).e(2).*q(iel).e(3)));
+    angles(3, iel) = atan2(2.*(q(iel).e(2).*q(iel).e(1) + ...
+    q(iel).e(3).*q(iel).e(4)), (q(iel).e(1). ^ 2 - ...
+    q(iel).e(2). ^ 2 + q(iel).e(3). ^ 2 - q(iel).e(4). ^ 2));
+    */
+  ci::Vec3f angles;
+  angles[0] = atan2(2 * (quaternion.v.x*quaternion.v.z - quaternion.v.x*quaternion.v.y), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
+  angles[1] = asin(2 * (quaternion.w*quaternion.v.z - quaternion.v.y*quaternion.v.x));
+  angles[2] = atan2(2 * (quaternion.v.x*quaternion.w + quaternion.v.y*quaternion.v.z), (quaternion.w * quaternion.w - quaternion.v.x * quaternion.v.x + quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
+
+  return angles;
+}
 
 ci::Vec3f SE3DaVinciPoseGrabber::GetZYXEulersFromQuaternion(const ci::Quatf &quaternion) const {
 
@@ -834,7 +903,7 @@ void SE3DaVinciPoseGrabber::LoadPoseAsEulerAngles(){
       wrist_dh_params_[i] = articulation[i];
     }
     
-    ci::Matrix44f rotation_matrix = MatrixFromIntrinsicEulers(eulers[0], eulers[1], eulers[2]);
+    ci::Matrix44f rotation_matrix = MatrixFromIntrinsicEulers(eulers[0], eulers[1], eulers[2], "zyx");
     
     rotation_ = rotation_matrix;
 
@@ -874,7 +943,7 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
   }
 
   
-  auto offset = MatrixFromIntrinsicEulers(x_rotation_offset_ - entire_x_rotation_offset_, y_rotation_offset_ - entire_y_rotation_offset_, z_rotation_offset_ - entire_z_rotation_offset_);
+  auto offset = MatrixFromIntrinsicEulers(x_rotation_offset_ - entire_x_rotation_offset_, y_rotation_offset_ - entire_y_rotation_offset_, z_rotation_offset_ - entire_z_rotation_offset_, "zyx");
 
   entire_x_rotation_offset_ = x_rotation_offset_;
   entire_y_rotation_offset_ = y_rotation_offset_;

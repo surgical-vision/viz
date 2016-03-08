@@ -262,6 +262,8 @@ void vizApp::setup(){
 
     setupFromConfig(cmd_line_args[1]);
     
+    state.load_all = true;
+
   }
   else{
     camera_image_width_ = 720;
@@ -276,7 +278,7 @@ void vizApp::setup(){
    
   setupGUI();
  
-  ci::app::setFrameRate(90);
+  ci::app::setFrameRate(200);
 
 }
 
@@ -419,6 +421,44 @@ void vizApp::drawRightEye(){
 
 }
 
+inline cv::Vec2i toOpenCV(const ci::Vec2i &v) { return cv::Vec2i(v[0], v[1]); }
+
+void vizApp::CreateContourFromFrame(cv::Mat &frame){
+
+  boost::shared_ptr<SE3DaVinciPoseGrabber> v = boost::dynamic_pointer_cast<SE3DaVinciPoseGrabber>(trackables_[0]);
+  std::array<ci::Vec2i, 4> rectangle;
+  cv::Mat affine_transform;
+  v->GetSubWindowCoordinates(camera_.GetLeftCamera(), rectangle, affine_transform);
+
+  //cv::line(frame, toOpenCV(rectangle[0]), toOpenCV(rectangle[1]), cv::Scalar(255, 0, 0), 3);
+  //cv::line(frame, toOpenCV(rectangle[1]), toOpenCV(rectangle[2]), cv::Scalar(255, 0, 0), 3);
+  //cv::line(frame, toOpenCV(rectangle[2]), toOpenCV(rectangle[3]), cv::Scalar(255, 0, 0), 3);
+  //cv::line(frame, toOpenCV(rectangle[3]), toOpenCV(rectangle[0]), cv::Scalar(255, 0, 0), 3);
+
+  const float width = std::sqrtf((rectangle[0].x - rectangle[1].x)*(rectangle[0].x - rectangle[1].x) + (rectangle[0].y - rectangle[1].y)*(rectangle[0].y - rectangle[1].y));
+  const float height = std::sqrtf((rectangle[1].x - rectangle[2].x)*(rectangle[1].x - rectangle[2].x) + (rectangle[1].y - rectangle[2].y)*(rectangle[1].y - rectangle[2].y));
+
+  std::vector<cv::Point2f> src_points;
+  src_points.push_back(cv::Point2f(toOpenCV(rectangle[0])));
+  src_points.push_back(cv::Point2f(toOpenCV(rectangle[1])));
+  //src_points.push_back(cv::Point2f(toOpenCV(rectangle[2])));
+  src_points.push_back(cv::Point2f(toOpenCV(rectangle[3])));
+
+  std::vector<cv::Point2f> dst_points;
+  dst_points.push_back(cv::Point2f(0, 0));
+  dst_points.push_back(cv::Point2f(width, 0));
+  dst_points.push_back(cv::Point2f(0, height));
+  //dst_points.push_back(cv::Point2f(width, height));
+
+  affine_transform = cv::getAffineTransform(src_points, dst_points);
+
+  cv::Mat output_frame;
+  cv::warpAffine(frame, output_frame, affine_transform, cv::Size(width, height));
+  
+  int x = 0;
+
+}
+
 void vizApp::draw(){
   
   gl::clear(Color(0, 0, 0));
@@ -441,7 +481,15 @@ void vizApp::draw(){
   left_eye.BindAndClear();
   drawLeftEye();
   left_eye.UnBind();
+  cv::Mat f = left_eye.getFrame();
+  cv::flip(f, f, 0);
+  CreateContourFromFrame(f);
+  cv::flip(f, f, 0);
+  left_eye.ReplaceFrame(f);
   left_eye.Draw();
+
+
+  
 
   /** draw right eye **/
   right_eye.BindAndClear();
@@ -962,20 +1010,6 @@ void vizApp::shutdown(){
 
   AppNative::shutdown();
   AppNative::quit();
-
-}
-
-inline ci::Vec3f GetExtrinsicEulers(const ci::Matrix33f &m){
-
-
-
-}
-
-
-
-inline ci::Vec3f GetIntrinsicEulers(const ci::Matrix33f &m){
-
-
 
 }
 

@@ -25,6 +25,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using namespace viz;
 
+ci::Vec2f Camera::ProjectVertexToPixel(const ci::Vec3f point_in_camera_coordinates) const{
+
+  cv::Point3d p(point_in_camera_coordinates[0], point_in_camera_coordinates[1], point_in_camera_coordinates[2]);
+  std::vector<cv::Point3d> pp; pp.push_back(p);
+  cv::Mat r = cv::Mat::eye(cv::Size(3, 3), CV_64FC1);
+  cv::Mat t = cv::Mat::zeros(cv::Size(3, 1), CV_64FC1);
+  std::vector<cv::Point2d> proj;
+  cv::Rodrigues(r, r);
+  cv::projectPoints(pp, r, t, camera_matrix_, cv::Mat::zeros(5, 1, CV_64FC1), proj);
+  return ci::Vec2i(proj[0].x, proj[0].y);
+
+}
+
 void Camera::Setup(const cv::Mat camera_matrix, const cv::Mat distortion_params, const int image_width, const int image_height, const int near_clip_distance, const int far_clip_distance){
 
   image_width_ = image_width;

@@ -67,34 +67,6 @@ void BaseModel::InternalDraw(const RenderData &rd, const float inc) const {
 
   ci::gl::multModelView(reflection*f);
   
-  //if (inc != 0.0){
-  //  
-  //  auto mat = ci::gl::getModelView();
-  //  ci::gl::multModelView(mat.inverted());
-  //  ci::Quatf q = mat;
-  //  ci::Quatf q1(q.getRoll(), q.getYaw(), q.getPitch());
-  //  ci::Quatf q2(q.getRoll(), q.getPitch(), q.getYaw());
-  //  ci::Quatf q3(q.getPitch(), q.getRoll(), q.getYaw());
-  //  ci::Quatf q4(q.getPitch(), q.getYaw(), q.getRoll());
-  //  ci::Quatf q5(q.getYaw(), q.getRoll(), q.getPitch());
-  //  ci::Quatf q6(q.getYaw(), q.getPitch(), q.getRoll());
-
-  //  ci::app::console() << "q = \n" << q << std::endl;
-  //  ci::app::console() << "q1 = \n" << q1 << std::endl;
-  //  ci::app::console() << "q2 = \n" << q2 << std::endl;
-  //  ci::app::console() << "q3 = \n" << q3 << std::endl;
-  //  ci::app::console() << "q4 = \n" << q4 << std::endl;
-  //  ci::app::console() << "q5 = \n" << q5 << std::endl;
-  //  ci::app::console() << "q6 = \n" << q6 << std::endl;
-  //  
-  //  ci::Matrix44f m(q2);
-  //  ci::gl::multModelView(m);
-
-  //}
-
-  
-  //ci::app::console() << "Shaft transform = (" << q.getRoll() << ", " << q.getPitch() << ", " << q.getYaw() << std::endl;
-
   rd.texture_.enableAndBind();
   //glEnable(GL_COLOR_MATERIAL); //cinder uses colors rather than materials which are ignore by lighting unless you do this call.
   

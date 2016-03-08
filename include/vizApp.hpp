@@ -75,6 +75,8 @@ namespace viz {
 
     static void AddSubWindow(SubWindow *sbw) { sub_windows_.push_back(sbw); }
 
+    void CreateContourFromFrame(cv::Mat &frame);
+
   protected:
 
     void save2DTrack();

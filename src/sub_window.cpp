@@ -62,6 +62,13 @@ void SubWindow::Bind() {
 
 }
 
+void SubWindow::ReplaceFrame(const cv::Mat &m){
+
+  cv::Mat mm = m;
+  framebuffer_->getTexture().update((ci::Surface)fromOcv(mm));
+
+}
+
 void SubWindow::BindAndClear(){
 
   Bind();
