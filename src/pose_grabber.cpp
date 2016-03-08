@@ -725,7 +725,7 @@ void SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
     std::string line;
     int row = 0;
 
-    ci::Vec4f articulation;
+    ci::Vec3f articulation;
     //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
 
 
@@ -737,7 +737,7 @@ void SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
       ifs_ >> rotation_[i];
     }
 
-    for (int i = 0; i < 4; ++i){
+    for (int i = 0; i < 3; ++i){
       ifs_ >> articulation[i];
     }
     for (int i = 0; i < 3; ++i){
@@ -779,7 +779,7 @@ void SE3DaVinciPoseGrabber::LoadPoseAsMatrix(){
     std::string line;
     int row = 0;
 
-    ci::Vec4f articulation;
+    ci::Vec3f articulation;
     //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
 
     ci::Matrix33f rotation_matrix;
@@ -815,7 +815,7 @@ void SE3DaVinciPoseGrabber::LoadPoseAsEulerAngles(){
     int row = 0;
 
     ci::Vec3f eulers;
-    ci::Vec4f articulation;
+    ci::Vec3f articulation;
     //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
 
 
@@ -827,7 +827,7 @@ void SE3DaVinciPoseGrabber::LoadPoseAsEulerAngles(){
       ifs_ >> eulers[i];
     }
 
-    for (int i = 0; i < 4; ++i){
+    for (int i = 0; i < 3; ++i){
       ifs_ >> articulation[i];
     }
     for (int i = 0; i < 3; ++i){
