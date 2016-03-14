@@ -54,6 +54,16 @@ namespace viz {
 
   };
 
+  class PythonInterface {
+
+  public:
+    void setFeature(const std::vector<float> &features) { features_ = features; }
+    std::vector<float> getFeature() { return features_; }
+
+  protected:
+    std::vector<float> features_;
+  };
+
   class vizApp : public AppNative {
 
   public:
@@ -75,7 +85,9 @@ namespace viz {
 
     static void AddSubWindow(SubWindow *sbw) { sub_windows_.push_back(sbw); }
 
+    std::vector<cv::Point> GetContourFromFrame(cv::Mat &frame);
     void CreateContourFromFrame(cv::Mat &frame);
+    void EvaluatePoseFromFrame(cv::Mat &frame);
 
   protected:
 

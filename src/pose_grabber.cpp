@@ -363,6 +363,8 @@ void DHDaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const s
       param_modifier_->addParam(ss.str(), &(arm_offsets_[i]), "min=-10 max=10 step= 0.001 keyIncr=z keyDecr=Z");
   }
 
+  SetOffsetsToNull();
+
 }
 
 ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
@@ -594,9 +596,15 @@ void SE3DaVinciPoseGrabber::SetupOffsets(const std::string &base_offsets, const 
       param_modifier_->addParam(ss2.str(), &(wrist_offsets_[i]), "min=-10 max=10 step= 0.001 keyIncr=z keyDecr=Z");
   }
 
+  SetOffsetsToNull();
+
 }
 
 void SE3DaVinciPoseGrabber::SetOffsetsToNull() {
+
+  entire_x_rotation_offset_ = 0.0f; 
+  entire_y_rotation_offset_ = 0.0f;
+  entire_z_rotation_offset_ = 0.0f;
 
   x_rotation_offset_ = 0.0f;
   y_rotation_offset_ = 0.0f;
@@ -722,11 +730,11 @@ inline ci::Quatf QuaternionFromEulers(float xRotation, float yRotation, float zR
 
   return r.normalized();
 }
-*
+*/
 
-//ci::Vec3f GetXYZEulersFromQuaternion(const ci::Quatf &quaternion){
-//
-//  ci::Vec3f angles;
+ci::Vec3f SE3DaVinciPoseGrabber::GetXYZEulersFromQuaternion(const ci::Quatf &quaternion) const {
+    
+  ci::Vec3f angles;
 //
 //  /*
 //  angles(1,iel) = atan2(2.*(q(iel).e(2).*q(iel).e(1)+ ...
@@ -739,14 +747,13 @@ inline ci::Quatf QuaternionFromEulers(float xRotation, float yRotation, float zR
 //                        q(iel).e(2).^2-q(iel).e(3).^2-q(iel).e(4).^2));  
 //  */
 
-//
-//  angles[0] = atan2(2 * (quaternion.v.x*quaternion.w + quaternion.v.z*quaternion.v.y), (quaternion.w * quaternion.w - quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y + quaternion.v.z * quaternion.v.z));
-//  angles[1] = asin(2 * (quaternion.v.y*quaternion.w - quaternion.v.x*quaternion.v.z));
-//  angles[2] = atan2(2 * (quaternion.v.x*quaternion.v.y + quaternion.v.z*quaternion.w), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
-//  
-//  return angles;
-//
-//}
+
+  angles[0] = atan2(2 * (quaternion.v.x*quaternion.w + quaternion.v.z*quaternion.v.y), (quaternion.w * quaternion.w - quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y + quaternion.v.z * quaternion.v.z));
+  angles[1] = asin(2 * (quaternion.v.y*quaternion.w - quaternion.v.x*quaternion.v.z));
+  angles[2] = atan2(2 * (quaternion.v.x*quaternion.v.y + quaternion.v.z*quaternion.w), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));  
+  return angles;
+
+}
 
 ci::Vec3f SE3DaVinciPoseGrabber::GetXZYEulersFromQuaternion(const ci::Quatf &quaternion) const {
 
@@ -788,7 +795,48 @@ ci::Vec3f SE3DaVinciPoseGrabber::GetZYXEulersFromQuaternion(const ci::Quatf &qua
 
 }
 
-void SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
+void SE3DaVinciPoseGrabber::GetPose(ci::Vec3f &translation, ci::Vec3f &rotation, ci::Vec3f &articulation) const {
+  
+  translation = translation_;
+
+  rotation = GetZYXEulersFromQuaternion(rotation_);
+
+  for (int i = 0; i < 3; ++i)
+    articulation[i] = wrist_dh_params_[i];
+
+}
+
+void SE3DaVinciPoseGrabber::EditPose(ci::Vec3f &translation, ci::Vec3f &rotation, ci::Vec3f &articulation){
+
+  //translation_[0] += 4;
+  
+  translation_ = translation;
+
+  ci::Vec3f current_rotation = GetXYZEulersFromQuaternion(rotation_ *  current_user_supplied_offset_);
+ 
+  for (int i = 0; i < 3; ++i)
+    wrist_dh_params_[i] = articulation[i];
+
+  shaft_pose_ = MatrixFromIntrinsicEulers(-current_rotation[0], current_rotation[1], rotation[2], "zyx") * current_user_supplied_offset_;
+
+  ci::Quatf new_r = shaft_pose_;
+
+  shaft_pose_.setTranslate(translation_);
+  model_.Shaft().transform_ = shaft_pose_;
+
+  viz::davinci::PSMData psm;
+  for (size_t i = 0; i < num_wrist_joints_; ++i){
+    psm.jnt_pos[i] = wrist_dh_params_[i];
+  }
+
+  buildKinematicChainAtEndPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
+  return;
+
+
+
+}
+
+bool SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
 
   try{
     std::string line;
@@ -828,19 +876,18 @@ void SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
     //rotation_ = qqnew;
 
     ci::Matrix44f rotation_m = rotation_;
-    shaft_pose_ = rotation_m; *current_user_supplied_offset_;
+    shaft_pose_ = rotation_m * current_user_supplied_offset_;
 
-
+    return true;
   }
   catch (std::ifstream::failure e){
     shaft_pose_.setToIdentity();
     do_draw_ = false;
-    return;
+    return false;
   }
 }
 
-
-void SE3DaVinciPoseGrabber::LoadPoseAsMatrix(){
+bool SE3DaVinciPoseGrabber::LoadPoseAsMatrix(){
 
   throw std::runtime_error("");
 
@@ -868,16 +915,16 @@ void SE3DaVinciPoseGrabber::LoadPoseAsMatrix(){
     ci::Matrix44f rotation_m = rotation_;
     shaft_pose_ = rotation_m *current_user_supplied_offset_;
 
-
+    return true;
   }
   catch (std::ifstream::failure e){
     shaft_pose_.setToIdentity();
     do_draw_ = false;
-    return;
+    return false;
   }
 }
 
-void SE3DaVinciPoseGrabber::LoadPoseAsEulerAngles(){
+bool SE3DaVinciPoseGrabber::LoadPoseAsEulerAngles(){
 
   try{
     std::string line;
@@ -910,12 +957,12 @@ void SE3DaVinciPoseGrabber::LoadPoseAsEulerAngles(){
     ci::Matrix44f rotation_m = rotation_;
     shaft_pose_ = rotation_m *current_user_supplied_offset_;
 
-
+    return true;
   }
   catch (std::ifstream::failure e){
     shaft_pose_.setToIdentity();
     do_draw_ = false;
-    return;
+    return false;
   }
 }
 
@@ -929,17 +976,24 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
 
   if (update_as_new){
 
+    if (ifs_.eof()) return false;
+
+    bool load_success = false;
+
     if (rotation_type_ == LoadType::QUATERNION)
-      LoadPoseAsQuaternion();
+      load_success = LoadPoseAsQuaternion();
 
     else if (rotation_type_ == LoadType::EULER)
-      LoadPoseAsEulerAngles();
+      load_success = LoadPoseAsEulerAngles();
 
     else if (rotation_type_ == LoadType::MATRIX)
-      LoadPoseAsMatrix();
+      load_success = LoadPoseAsMatrix();
 
     else
       return false;
+
+    if (!load_success) return false;
+
   }
 
   

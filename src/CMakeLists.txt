@@ -19,10 +19,11 @@ set(
   ${INCDIR}/resources.hpp
   ${INCDIR}/vizApp.hpp  ${INCDIR}/video.hpp
   ${INCDIR}/model.hpp ${INCDIR}/sub_window.hpp
+  ${INCDIR}/fourier_descriptor.hpp
 )
 
 ## Store list of source files
-set( SOURCES camera.cpp davinci.cpp pose_grabber.cpp video.cpp vizApp.cpp model.cpp sub_window.cpp )
+set( SOURCES camera.cpp davinci.cpp pose_grabber.cpp video.cpp vizApp.cpp model.cpp sub_window.cpp fourier_descriptor.cpp)
 
 
 #######################################################
@@ -31,13 +32,17 @@ set( SOURCES camera.cpp davinci.cpp pose_grabber.cpp video.cpp vizApp.cpp model.
 # Project headers trump everything (including any potentially installed Pangolin)
 list(APPEND LIB_INC_DIR  "${PROJECT_SOURCE_DIR}/include;${CMAKE_CURRENT_BINARY_DIR}/include" )
 
+list(APPEND LIB_INC_DIR "c:/Python27/include/")
+list(APPEND LINK_LIBS "c:/Python27/libs/python27.lib")
+
 #Boost
 set(Boost_USE_STATIC_LIBS ON) 
 set(Boost_USE_MULTITHREADED ON)  
 set(Boost_USE_STATIC_RUNTIME OFF)
 #set(Boost_BOOST_ALL_DYN_LINK)
-find_package(Boost REQUIRED COMPONENTS regex chrono date_time system filesystem thread)
+find_package(Boost REQUIRED COMPONENTS regex chrono date_time system filesystem thread python)
 if(Boost_FOUND)
+    ADD_DEFINITIONS("-DBOOST_ALL_NO_LIB")
     list(APPEND USER_INC "${Boost_INCLUDE_DIRS}")
     list(APPEND LINK_LIBS "${Boost_LIBRARIES}")
 endif()

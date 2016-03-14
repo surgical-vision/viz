@@ -349,6 +349,9 @@ namespace viz {
     */
     virtual bool LoadPose(const bool update_as_new);
 
+    void GetPose(ci::Vec3f &translation, ci::Vec3f &rotation, ci::Vec3f &articulation) const;
+    void EditPose(ci::Vec3f &translation, ci::Vec3f &rotation, ci::Vec3f &articulation);
+
     /**
     * Return the current pose estimate.
     * @return Return the current pose estimate.
@@ -377,14 +380,15 @@ namespace viz {
     enum LoadType {QUATERNION, MATRIX, EULER};
     LoadType rotation_type_;
 
-    void LoadPoseAsQuaternion();
-    void LoadPoseAsMatrix();
+    bool LoadPoseAsQuaternion();
+    bool LoadPoseAsMatrix();
 
     //assume intrinsic eulers and x-y-z order
-    void LoadPoseAsEulerAngles();
+    bool LoadPoseAsEulerAngles();
     ci::Matrix44f MatrixFromIntrinsicEulers(float xRotation, float yRotation, float zRotation, const std::string &order) const;
     ci::Vec3f GetZYXEulersFromQuaternion(const ci::Quatf &quaternion) const;
     ci::Vec3f GetXZYEulersFromQuaternion(const ci::Quatf &quaternion) const;
+    ci::Vec3f GetXYZEulersFromQuaternion(const ci::Quatf &quaternion) const;
     ci::Matrix44f RemoveOutOfPlaneRotation(const ci::Matrix44f &pose) const; 
 
     virtual void SetOffsetsToNull() override;

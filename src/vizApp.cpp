@@ -22,10 +22,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <locale>
 #include <cinder/gl/Vbo.h>
 #include <opencv2/highgui/highgui.hpp>
+#include <deque>
+
+#ifdef _DEBUG
+#undef _DEBUG
+#include <Python.h>
+#define _DEBUG
+#else
+#include <Python.h>
+#endif
+
+#define BOOST_PYTHON_STATIC_LIB 
+#include <boost/python.hpp>
 
 #include "../include/config_reader.hpp"
 #include "../include/vizApp.hpp"
 #include "../include/resources.hpp"
+#include "../include/fourier_descriptor.hpp"
 
 using namespace viz;
 
@@ -280,6 +293,8 @@ void vizApp::setup(){
  
   ci::app::setFrameRate(200);
 
+  Py_Initialize();
+
 }
 
 void vizApp::updateModels(){
@@ -423,17 +438,346 @@ void vizApp::drawRightEye(){
 
 inline cv::Vec2i toOpenCV(const ci::Vec2i &v) { return cv::Vec2i(v[0], v[1]); }
 
-void vizApp::CreateContourFromFrame(cv::Mat &frame){
+
+std::vector<cv::Point> UpdateContour(const cv::Mat &image){
+
+  std::vector<cv::Point> updated_contour;
+  for (int r = 0; r < image.rows; ++r){
+    for (int c = 0; c < image.cols; ++c){
+      if (image.at<unsigned char>(r, c) == 255){
+        updated_contour.push_back(cv::Point(c, r));
+      }
+    }
+  }
+
+  return updated_contour;
+}
+
+
+void DrawContour(const std::vector<cv::Point> &contour, cv::Mat &frame){
+
+  frame.setTo(0);
+
+  std::vector<std::vector<cv::Point> > t;
+  t.push_back(contour);
+
+  drawContours(frame, t, -1, cv::Scalar(255), 1, 8);
+
+}
+
+std::vector < str::EllipticalFourierDescriptor > GetFourierDescriptorsFromContour(const std::vector< cv::Point> &contour){
+
+  static str::EllipticalFourierDescriptorBuilder builder;
+
+  auto descriptors = builder.BuildFromContour(contour);
+
+  return descriptors;
+
+}
+
+bool InPreviousPoints(const cv::Point &current_point, const std::deque<cv::Point> &contour){
+
+  int j = 0;
+  for (int i = contour.size() - 1; i > 0 && j < 4; --i, ++j){
+    if (current_point == contour[i]) return true;
+  }
+
+  return false;
+
+}
+
+bool FindAdjacentPixel(const cv::Mat &image, const cv::Point &start_point, cv::Point &current_point, std::deque < cv::Point> &contour){
+
+  cv::Point neighbour_point = current_point;
+
+  while (true){
+    
+    //N
+    cv::Point tmp_neighbour_point = neighbour_point; tmp_neighbour_point.y -= 1;
+    if (cv::Rect(0, 0, image.cols, image.rows).contains(tmp_neighbour_point) && image.at<unsigned char>(tmp_neighbour_point) && InPreviousPoints(tmp_neighbour_point, contour)){
+      neighbour_point = tmp_neighbour_point;
+      contour.push_back(neighbour_point);
+      int index = contour.size() - 1;
+      if (FindAdjacentPixel(image, start_point, neighbour_point, contour)){
+        break;
+      }
+      else{
+        contour.erase(contour.begin() + index);
+      }
+    }
+
+    //NE
+    tmp_neighbour_point = neighbour_point; tmp_neighbour_point.y -= 1; tmp_neighbour_point.x += 1;
+    if (cv::Rect(0, 0, image.cols, image.rows).contains(tmp_neighbour_point) && image.at<unsigned char>(tmp_neighbour_point) && InPreviousPoints(tmp_neighbour_point, contour)){
+      neighbour_point = tmp_neighbour_point;
+      if (FindAdjacentPixel(image, start_point, neighbour_point, contour)){
+        contour.push_front(neighbour_point);
+        break;
+      }
+    }
+
+    //E
+    tmp_neighbour_point = neighbour_point; tmp_neighbour_point.y += 1;
+    if (cv::Rect(0, 0, image.cols, image.rows).contains(tmp_neighbour_point) && image.at<unsigned char>(tmp_neighbour_point) && InPreviousPoints(tmp_neighbour_point, contour)){
+      neighbour_point = tmp_neighbour_point;
+      if (FindAdjacentPixel(image, start_point, neighbour_point, contour)){
+        contour.push_front(neighbour_point);
+        break; 
+      }
+    }
+
+    //SE
+    tmp_neighbour_point = neighbour_point; tmp_neighbour_point.y += 1; tmp_neighbour_point.x += 1;
+    if (cv::Rect(0, 0, image.cols, image.rows).contains(tmp_neighbour_point) && image.at<unsigned char>(tmp_neighbour_point) && InPreviousPoints(tmp_neighbour_point, contour)){
+      neighbour_point = tmp_neighbour_point;
+      if (FindAdjacentPixel(image, start_point, neighbour_point, contour)){
+        contour.push_front(neighbour_point);
+        break;
+      }
+    }
+
+    //S
+    tmp_neighbour_point = neighbour_point; tmp_neighbour_point.y += 1;
+    if (cv::Rect(0, 0, image.cols, image.rows).contains(tmp_neighbour_point) && image.at<unsigned char>(tmp_neighbour_point) && InPreviousPoints(tmp_neighbour_point, contour)){
+      neighbour_point = tmp_neighbour_point;
+      if (FindAdjacentPixel(image, start_point, neighbour_point, contour)){
+        contour.push_front(neighbour_point);
+        break;
+      }
+    }
+
+    //N
+    tmp_neighbour_point = neighbour_point; tmp_neighbour_point.y -= 1;
+    if (cv::Rect(0, 0, image.cols, image.rows).contains(tmp_neighbour_point) && image.at<unsigned char>(tmp_neighbour_point) && InPreviousPoints(tmp_neighbour_point, contour)){
+      neighbour_point = tmp_neighbour_point;
+      if (FindAdjacentPixel(image, start_point, neighbour_point, contour)){
+        contour.push_front(neighbour_point);
+        break;
+      }
+    }
+
+    //N
+    tmp_neighbour_point = neighbour_point; tmp_neighbour_point.y -= 1;
+    if (cv::Rect(0, 0, image.cols, image.rows).contains(tmp_neighbour_point) && image.at<unsigned char>(tmp_neighbour_point) && InPreviousPoints(tmp_neighbour_point, contour)){
+      neighbour_point = tmp_neighbour_point;
+      if (FindAdjacentPixel(image, start_point, neighbour_point, contour)){
+        contour.push_front(neighbour_point);
+        break;
+      }
+    }
+
+    //N
+    tmp_neighbour_point = neighbour_point; tmp_neighbour_point.y -= 1;
+    if (cv::Rect(0, 0, image.cols, image.rows).contains(tmp_neighbour_point) && image.at<unsigned char>(tmp_neighbour_point) && InPreviousPoints(tmp_neighbour_point, contour)){
+      neighbour_point = tmp_neighbour_point;
+      if (FindAdjacentPixel(image, start_point, neighbour_point, contour)){
+        contour.push_front(neighbour_point);
+        break;
+      }
+    }
+
+    break;
+
+  }
+  
+  if (neighbour_point == start_point) return false;
+
+
+
+}
+
+std::vector<cv::Point> CreateFreemanChain(const std::vector<cv::Point> &contour, size_t image_width, size_t image_height){
+
+  cv::Mat image = cv::Mat::zeros(cv::Size(image_width, image_height), CV_8UC1);
+  for (auto &px : contour){
+
+    image.at<unsigned char>(px.y, px.x) = 1;
+
+  }
+
+  cv::Point start_point;
+  for (size_t r = 0; r < image_height; ++r){
+    for (size_t c = 0; c < image_width; ++c){
+
+      if (image.at<unsigned char>(r, c) == 1){
+        start_point = cv::Point(c, r);
+        break;
+      }
+
+    }
+  }
+
+  std::vector<cv::Point> output_contour;
+  bool add = false;
+  for (auto &pix : contour){
+
+    if (pix == start_point) add = true;
+    if (add)
+      output_contour.push_back(pix);
+
+  }
+
+  for (auto &pix : contour){
+
+    if (pix == start_point) add = false;
+    if (add)
+      output_contour.push_back(pix);
+
+  }
+
+  return output_contour;
+
+}
+
+void vizApp::EvaluatePoseFromFrame(cv::Mat &frame){
+
+  //static std::ifstream pose_file("C:/Users/max/libs/str-forest/data/no_6dof_data/d0/output/output_poses.txt");
+
+  //float x_translation, y_translation, z_translation, x_rotation, y_rotation, z_rotation;
+  //float wrist_angle, clasper_direction, clasper_angle;
+
+  //pose_file >> x_translation >> y_translation >> z_translation >> x_rotation >> y_rotation >> z_rotation >> wrist_angle >> clasper_direction >> clasper_angle;
+
+  /*
+  ci::app::console() << "HEre" << std::endl;
+
+  std::vector<cv::Point> largest_contour = GetContourFromFrame(frame);
+  auto descriptors = GetFourierDescriptorsFromContour(largest_contour);
+
+  std::vector<float> flattened_descriptor;
+  for (auto &d : descriptors){
+    for (int i = 0; i < 4; ++i)
+      flattened_descriptor.push_back(d[i]);
+  }
+
+  //boost::python::exec("from sklearn.ensemble import RandomForestRegressor", main_namespace);
+  static PyObject *file = PyFile_FromString("C:/Users/max/libs/str-forest/proto/forest_articulated_only.pkl", "rb");
+  //static PyObject *module_name = PyString_FromString("pickle");
+
+  static PyObject *sys = PyImport_ImportModule("sys");
+  static PyObject *path = PyObject_GetAttrString(sys, "path");
+  static bool first = true;
+  if (first){
+    PyList_Append(path, PyString_FromString("C:/Python27/Lib/"));
+    first = false;
+  }
+
+  ci::app::console() << "HEre 2" << std::endl;
+  static PyObject *module = PyImport_ImportModule("pickle");
+  //PyObject *ptype, *pvalue, *ptraceback;
+  //PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+  //std::string pStrErrorMessage = PyString_AsString(pvalue);
+  
+  static PyObject *function = PyObject_GetAttrString(module, "load");
+  static PyObject *args = PyTuple_Pack(1, file);
+  static PyObject *predictor = PyObject_CallObject(function, args);
+
+  //convert flattened_desctiptor to python list
+  PyObject* descriptor = PyList_New(flattened_descriptor.size());
+  for (Py_ssize_t i = 0; i < flattened_descriptor.size(); i++) {
+    PyList_SetItem(descriptor, i, PyFloat_FromDouble(flattened_descriptor[i]));
+  }
+  ci::app::console() << "HEre 3" << std::endl;
+  PyObject *pose = PyObject_CallMethodObjArgs(predictor, PyString_FromString("predict"), descriptor, NULL);
+  if (pose == NULL) {
+    ci::app::console() << "Pose is null" << std::endl;
+    PyObject *ptype, *pvalue, *ptraceback;
+    PyErr_Fetch(&ptype, &pvalue, &ptraceback);
+    std::string pStrErrorMessage = PyString_AsString(pvalue);
+    ci::app::console() << pStrErrorMessage << std::endl;
+  }
+  ci::app::console() << "HEre 3a" << std::endl;
+  PyObject *tolist = PyObject_GetAttrString(pose, "tolist");
+  ci::app::console() << "HEre 3b" << std::endl;
+  PyObject *listoflist = PyObject_CallObject(tolist, NULL);
+  ci::app::console() << "HEre 3c" << std::endl;
+
+  std::vector<float> pose_cpp;
+  //convert pose back to c++ vector
+  PyObject *list = PyList_GetItem(listoflist, 0);
+  ci::app::console() << "HEre 3d" << std::endl;
+  for (Py_ssize_t i = 0; i < PyList_Size(list); i++) {
+    PyObject *p = PyList_GetItem(list, i);
+    ci::app::console() << "HEre 3e" << std::endl;
+    pose_cpp.push_back(PyFloat_AsDouble(p));
+    ci::app::console() << "HEre 3f" << std::endl;
+  }
+  ci::app::console() << "HEre 4" << std::endl;
+
+  */
+
+  static std::ifstream ifs("C:/Users/max/libs/str-forest/data/no_6dof_data/d0/output.txt");
+
+
+
+  boost::shared_ptr<SE3DaVinciPoseGrabber> v = boost::dynamic_pointer_cast<SE3DaVinciPoseGrabber>(trackables_[0]);
+
+  /*
+  float x_translation = pose_cpp[0];
+  float y_translation = pose_cpp[1];
+  float z_translation = pose_cpp[2];
+  float x_rotation = pose_cpp[3];
+  float y_rotation = pose_cpp[4];
+  float z_rotation = pose_cpp[5];
+  float wrist_angle = pose_cpp[6];
+  float clasper_direction = pose_cpp[7];
+  float clasper_angle = pose_cpp[8]; 
+  */
+  float x_translation;
+  float y_translation;
+  float z_translation;
+  float x_rotation;
+  float y_rotation;
+  float z_rotation;    
+  float wrist_angle;
+  float clasper_direction;
+  float clasper_angle;
+  
+  ifs >> x_translation >> y_translation >> z_translation >> x_rotation >> y_rotation >> z_rotation >> wrist_angle >> clasper_direction >> clasper_angle;
+
+  ci::app::console() << "HEre 5" << std::endl;
+
+  v->EditPose(ci::Vec3f(x_translation, y_translation, z_translation), ci::Vec3f(x_rotation, y_rotation, z_rotation), ci::Vec3f(wrist_angle, clasper_direction, clasper_angle));
+
+  left_eye.Bind();
+  gl::enableDepthRead();
+  gl::enableDepthWrite();
+  gl::pushMatrices();
+
+  ci::app::console() << "HEre 6" << std::endl;
+  camera_.setupLeftCamera(maya_cam_, getCameraPose()); //do viewport and set camera pose
+  
+  //shader_.bind();
+  //shader_.uniform("tex0", 0);
+
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  drawTargets();
+  glDisable(GL_BLEND);
+
+  //shader_.unbind();
+
+  gl::popMatrices();
+
+  camera_.unsetCameras(); //reset the viewport values
+  left_eye.UnBind();
+
+  ci::app::console() << "HEre 7" << std::endl;
+}
+
+std::vector<cv::Point> vizApp::GetContourFromFrame(cv::Mat &frame){
 
   boost::shared_ptr<SE3DaVinciPoseGrabber> v = boost::dynamic_pointer_cast<SE3DaVinciPoseGrabber>(trackables_[0]);
   std::array<ci::Vec2i, 4> rectangle;
   cv::Mat affine_transform;
   v->GetSubWindowCoordinates(camera_.GetLeftCamera(), rectangle, affine_transform);
 
-  //cv::line(frame, toOpenCV(rectangle[0]), toOpenCV(rectangle[1]), cv::Scalar(255, 0, 0), 3);
-  //cv::line(frame, toOpenCV(rectangle[1]), toOpenCV(rectangle[2]), cv::Scalar(255, 0, 0), 3);
-  //cv::line(frame, toOpenCV(rectangle[2]), toOpenCV(rectangle[3]), cv::Scalar(255, 0, 0), 3);
-  //cv::line(frame, toOpenCV(rectangle[3]), toOpenCV(rectangle[0]), cv::Scalar(255, 0, 0), 3);
+  cv::Mat view_frame = frame.clone();
+
+  cv::line(view_frame, toOpenCV(rectangle[0]), toOpenCV(rectangle[1]), cv::Scalar(255, 0, 0), 3);
+  cv::line(view_frame, toOpenCV(rectangle[1]), toOpenCV(rectangle[2]), cv::Scalar(255, 0, 0), 3);
+  cv::line(view_frame, toOpenCV(rectangle[2]), toOpenCV(rectangle[3]), cv::Scalar(255, 0, 0), 3);
+  cv::line(view_frame, toOpenCV(rectangle[3]), toOpenCV(rectangle[0]), cv::Scalar(255, 0, 0), 3);
 
   const float width = std::sqrtf((rectangle[0].x - rectangle[1].x)*(rectangle[0].x - rectangle[1].x) + (rectangle[0].y - rectangle[1].y)*(rectangle[0].y - rectangle[1].y));
   const float height = std::sqrtf((rectangle[1].x - rectangle[2].x)*(rectangle[1].x - rectangle[2].x) + (rectangle[1].y - rectangle[2].y)*(rectangle[1].y - rectangle[2].y));
@@ -454,8 +798,54 @@ void vizApp::CreateContourFromFrame(cv::Mat &frame){
 
   cv::Mat output_frame;
   cv::warpAffine(frame, output_frame, affine_transform, cv::Size(width, height));
+
+  cv::Mat contour_image = cv::Mat::zeros(output_frame.size(), CV_8UC1);
+  for (int r = 4; r < contour_image.rows - 4; ++r){
+    for (int c = 4; c < contour_image.cols - 4; ++c){
+      if (output_frame.at<cv::Vec4b>(r, c) != cv::Vec4b(0, 0, 255, 255)){
+        contour_image.at<unsigned char>(r, c) = 255;
+      }
+    }
+  }
+
+  std::vector<std::vector<cv::Point> > contours;
+  cv::findContours(contour_image, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
   
-  int x = 0;
+  frame = view_frame;
+
+  return contours[0];
+
+}
+
+void vizApp::CreateContourFromFrame(cv::Mat &frame){
+
+  boost::filesystem::create_directories(SubWindow::output_directory);
+  //static std::ofstream contour_file(SubWindow::output_directory + "/contour.txt");
+  static std::ofstream feature_file(SubWindow::output_directory + "/features.txt");
+
+  std::vector<cv::Point> largest_contour = GetContourFromFrame(frame);
+
+  //for (size_t i = 0; i < largest_contour.size(); ++i){
+
+    //auto &pix = largest_contour[i];
+    //contour_file << pix.x << ", " << pix.y;
+    //if (i != (largest_contour.size() - 1)) contour_file << ", ";
+
+  //}
+  //contour_file << std::endl;
+
+  auto descriptors = GetFourierDescriptorsFromContour(largest_contour);
+
+  for (size_t i = 0; i < descriptors.size(); ++i){
+
+    auto &descriptor = descriptors[i];
+    feature_file << descriptor.vals_[0] << ", " << descriptor.vals_[1] << ", " <<  descriptor.vals_[2] << ", " << descriptor.vals_[3];
+    if (i != (descriptors.size() - 1)) feature_file << ", ";
+
+  }
+
+  feature_file << std::endl;
+
 
 }
 
@@ -482,15 +872,7 @@ void vizApp::draw(){
   drawLeftEye();
   left_eye.UnBind();
   cv::Mat f = left_eye.getFrame();
-  cv::flip(f, f, 0);
-  CreateContourFromFrame(f);
-  cv::flip(f, f, 0);
-  left_eye.ReplaceFrame(f);
-  left_eye.Draw();
-
-
   
-
   /** draw right eye **/
   right_eye.BindAndClear();
   drawRightEye();
@@ -509,6 +891,15 @@ void vizApp::draw(){
   trajectory_viewer.Draw();
   
   saveState();
+
+  //dont actually use frame
+  //EvaluatePoseFromFrame(f);
+
+  cv::flip(f, f, 0);
+  CreateContourFromFrame(f);
+  cv::flip(f, f, 0);
+  left_eye.ReplaceFrame(f);
+  left_eye.Draw();
 
   state.load_one = false;
   state.save_one = false;
@@ -1008,6 +1399,8 @@ void vizApp::shutdown(){
 
   running_ = false;
 
+  Py_Finalize();
+
   AppNative::shutdown();
   AppNative::quit();
 
@@ -1015,28 +1408,8 @@ void vizApp::shutdown(){
 
 void vizApp::drawTargets(){
 
-  static ci::Matrix44f m;
-  
   for (size_t i = 0; i < trackables_.size(); ++i){
-
-    //if (m != trackables_[i]->GetPose()){
-
-    //  //ci::app::console() << "Pose = \n" << moveable_camera_->GetPose().inverted() * trackables_[i]->GetPose();
-    m = trackables_[i]->GetPose();
-
-    ci::Matrix33f m33 = m.subMatrix33(0, 0);
-    ci::Quatf q = m33;
-    ci::app::console() << "Pitch = " << q.getPitch() << std::endl;
-    ci::app::console() << "Roll = " << q.getRoll() << std::endl;
-    ci::app::console() << "Yaw = " << q.getYaw() << std::endl;
-
-    q = ci::Quatf(q.getPitch(), q.getYaw(), q.getRoll());
-
-
-    //}
-
     trackables_[i]->Draw();
-
   }
 
 }
