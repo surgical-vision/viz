@@ -24,16 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <opencv2/highgui/highgui.hpp>
 #include <deque>
 
-#ifdef _DEBUG
-#undef _DEBUG
-#include <Python.h>
-#define _DEBUG
-#else
-#include <Python.h>
-#endif
-
-#define BOOST_PYTHON_STATIC_LIB 
-#include <boost/python.hpp>
+//#ifdef _DEBUG
+//#undef _DEBUG
+//#include <Python.h>
+//#define _DEBUG
+//#else
+//#include <Python.h>
+//#endif
+//
+//#define BOOST_PYTHON_STATIC_LIB 
+//#include <boost/python.hpp>
 
 #include "../include/config_reader.hpp"
 #include "../include/vizApp.hpp"
@@ -293,7 +293,7 @@ void vizApp::setup(){
  
   ci::app::setFrameRate(200);
 
-  Py_Initialize();
+  //Py_Initialize();
 
 }
 
@@ -813,7 +813,12 @@ std::vector<cv::Point> vizApp::GetContourFromFrame(cv::Mat &frame){
   
   frame = view_frame;
 
-  return contours[0];
+  std::vector<cv::Point> largest;
+  for (size_t i = 0; i < contours.size(); ++i){
+    if (contours[i].size() > largest.size()) largest = contours[i];
+  }
+
+  return largest;
 
 }
 
@@ -825,25 +830,30 @@ void vizApp::CreateContourFromFrame(cv::Mat &frame){
 
   std::vector<cv::Point> largest_contour = GetContourFromFrame(frame);
 
-  //for (size_t i = 0; i < largest_contour.size(); ++i){
+  if (largest_contour.size() < 10){
+    feature_file << "-1";
+  }
+  else{
+
+    //for (size_t i = 0; i < largest_contour.size(); ++i){
 
     //auto &pix = largest_contour[i];
     //contour_file << pix.x << ", " << pix.y;
     //if (i != (largest_contour.size() - 1)) contour_file << ", ";
 
-  //}
-  //contour_file << std::endl;
+    //}
+    //contour_file << std::endl;
 
-  auto descriptors = GetFourierDescriptorsFromContour(largest_contour);
+    auto descriptors = GetFourierDescriptorsFromContour(largest_contour);
 
-  for (size_t i = 0; i < descriptors.size(); ++i){
+    for (size_t i = 0; i < descriptors.size(); ++i){
 
-    auto &descriptor = descriptors[i];
-    feature_file << descriptor.vals_[0] << ", " << descriptor.vals_[1] << ", " <<  descriptor.vals_[2] << ", " << descriptor.vals_[3];
-    if (i != (descriptors.size() - 1)) feature_file << ", ";
+      auto &descriptor = descriptors[i];
+      feature_file << descriptor.vals_[0] << ", " << descriptor.vals_[1] << ", " << descriptor.vals_[2] << ", " << descriptor.vals_[3];
+      if (i != (descriptors.size() - 1)) feature_file << ", ";
 
+    }
   }
-
   feature_file << std::endl;
 
 
@@ -873,22 +883,22 @@ void vizApp::draw(){
   left_eye.UnBind();
   cv::Mat f = left_eye.getFrame();
   
-  /** draw right eye **/
-  right_eye.BindAndClear();
-  drawRightEye();
-  right_eye.UnBind();
-  right_eye.Draw();
+  ///** draw right eye **/
+  //right_eye.BindAndClear();
+  //drawRightEye();
+  //right_eye.UnBind();
+  //right_eye.Draw();
 
-  /** draw scene **/
-  scene_viewer.BindAndClear();
-  drawScene(left_texture_, right_texture_);
-  scene_viewer.UnBind();
-  scene_viewer.Draw();
+  ///** draw scene **/
+  //scene_viewer.BindAndClear();
+  //drawScene(left_texture_, right_texture_);
+  //scene_viewer.UnBind();
+  //scene_viewer.Draw();
 
-  trajectory_viewer.BindAndClear();
-  drawCameraTracker();
-  trajectory_viewer.UnBind();
-  trajectory_viewer.Draw();
+  //trajectory_viewer.BindAndClear();
+  //drawCameraTracker();
+  //trajectory_viewer.UnBind();
+  //trajectory_viewer.Draw();
   
   saveState();
 
@@ -1399,7 +1409,7 @@ void vizApp::shutdown(){
 
   running_ = false;
 
-  Py_Finalize();
+  //Py_Finalize();
 
   AppNative::shutdown();
   AppNative::quit();

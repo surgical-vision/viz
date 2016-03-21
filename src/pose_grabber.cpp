@@ -88,11 +88,7 @@ void SE3DaVinciPoseGrabber::GetSubWindowCoordinates(const viz::Camera &camera, s
   ci::Vec2f local_vertical_axis = angle_of_shaft - center_of_mass; local_vertical_axis.normalize();
   ci::Vec2f local_horizontal_axis = ci::Vec2f(local_vertical_axis[1], -local_vertical_axis[0]);
 
-  std::vector<ci::Matrix44f> transforms = model_.GetTransformSet();
-  ci::Matrix44f head_transform = transforms[2];
-
-  const ci::Vec2i center_of_head = camera.ProjectVertexToPixel(head_transform * ci::Vec3f(0, 0, 0));
-  float distance = std::sqrtf((center_of_mass.x - center_of_head.x)*(center_of_mass.x - center_of_head.x) + (center_of_mass.y - center_of_head.y)*(center_of_mass.y - center_of_head.y));
+  float distance = std::sqrtf((center_of_mass.x - angle_of_shaft.x)*(center_of_mass.x - angle_of_shaft.x) + (center_of_mass.y - angle_of_shaft.y)*(center_of_mass.y - angle_of_shaft.y));
 
   ci::Vec2i top_left = center_of_mass + (2.4 * distance*local_vertical_axis) + (2 * distance* local_horizontal_axis);
   ci::Vec2i top_right = center_of_mass + (2.4 * distance*local_vertical_axis) - (2 * distance* local_horizontal_axis);
@@ -789,7 +785,8 @@ ci::Vec3f SE3DaVinciPoseGrabber::GetZYXEulersFromQuaternion(const ci::Quatf &qua
 
   angles[0] = atan2(2 * (quaternion.v.z*quaternion.w - quaternion.v.x*quaternion.v.y), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
   angles[1] = asin(2 * (quaternion.v.x*quaternion.v.z + quaternion.v.y*quaternion.w));
-  angles[2] = atan2(2 * (quaternion.v.x*quaternion.w - quaternion.v.y*quaternion.v.z), (quaternion.w * quaternion.w + quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y - quaternion.v.z * quaternion.v.z));
+  angles[2] = atan2(2 * (quaternion.v.x*quaternion.w - quaternion.v.y*quaternion.v.z), 
+    (quaternion.w * quaternion.w - quaternion.v.x * quaternion.v.x - quaternion.v.y * quaternion.v.y + quaternion.v.z * quaternion.v.z));
 
   return angles;
 
@@ -812,12 +809,12 @@ void SE3DaVinciPoseGrabber::EditPose(ci::Vec3f &translation, ci::Vec3f &rotation
   
   translation_ = translation;
 
-  ci::Vec3f current_rotation = GetXYZEulersFromQuaternion(rotation_ *  current_user_supplied_offset_);
+  ci::Vec3f current_rotation = GetZYXEulersFromQuaternion(rotation_ *  current_user_supplied_offset_);
  
   for (int i = 0; i < 3; ++i)
     wrist_dh_params_[i] = articulation[i];
 
-  shaft_pose_ = MatrixFromIntrinsicEulers(-current_rotation[0], current_rotation[1], rotation[2], "zyx") * current_user_supplied_offset_;
+  shaft_pose_ = MatrixFromIntrinsicEulers(current_rotation[2], current_rotation[1], current_rotation[0], "zyx") * current_user_supplied_offset_;
 
   ci::Quatf new_r = shaft_pose_;
 
@@ -934,10 +931,9 @@ bool SE3DaVinciPoseGrabber::LoadPoseAsEulerAngles(){
     ci::Vec3f articulation;
     //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
 
-
     for (int i = 0; i < 3; ++i){
       ifs_ >> translation_[i];
-    }
+     }
 
     for (int i = 0; i < 3; ++i){
       ifs_ >> eulers[i];
