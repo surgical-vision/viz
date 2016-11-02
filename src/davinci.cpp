@@ -96,7 +96,7 @@ DaVinciKinematicChain::DaVinciKinematicChain(void){
   // Denavit-Hartenberg parameters from PSM2 origin to PSM2 tip (assumes needle driver instrument)
   const float PSM2_lenRCC = 0.4318f;
   const float PSM2_ToolLen = 0.4159f;
-  const float PSM2_PitchToYaw = 0.009f;
+  const float PSM2_PitchToYaw = 0.008f;
   const float PSM2_YawToCtrlPnt = 0.0f;
   mPSM2OriginPSM2Tip.push_back(DenavitHartenbergFrame(1, JointTypeEnum::ROTARY, 0.0f, PI_2, 0.0f, PI_2));
   mPSM2OriginPSM2Tip.push_back(DenavitHartenbergFrame(2, JointTypeEnum::ROTARY, 0.0f, -PI_2, 0.0f, -PI_2));
@@ -321,13 +321,13 @@ void viz::davinci::buildKinematicChainAtEndPSM1(DaVinciKinematicChain &mDaVinciC
   double clasper_angle = psm.jnt_pos[2];
 
   ci::Matrix44d clasper_rotation; 
-  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), clasper_angle);
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), psm.jnt_pos[2]);
   ci::Matrix44d grip1d = grip1;
   ci::Matrix44d grip2d = grip2;
 
   glhMultMatrixRight(clasper_rotation.m, grip1d.m);
 
-  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), -clasper_angle);
+  clasper_rotation = clasper_rotation.createRotation(ci::Vec3f(0, 1, 0), -psm.jnt_pos[3]);
   glhMultMatrixRight(clasper_rotation.m, grip2d.m);
   
   grip1 = grip1d;

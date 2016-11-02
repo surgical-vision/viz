@@ -127,6 +127,7 @@ void VideoIO::Read(cv::Mat &left, cv::Mat &right){
   }
 
   cv::Mat f;
+
   cap_ >> f;
 
   if (f.data == 0x0){

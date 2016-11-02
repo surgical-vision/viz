@@ -208,6 +208,7 @@ void StereoCamera::moveEyeToRightCam(ci::MayaCamUI &cam, const ci::Matrix44f &cu
   ci::Vec3f eye_point(0, 0, 0);
   ci::Vec3f view_direction(0, 0, 1);
   ci::Vec3f world_up(0, -1, 0);
+  
 
   glEnable(GL_LIGHTING);
 

@@ -39,6 +39,13 @@ std::string BasePoseGrabber::WriteSE3ToString(const ci::Matrix44f &mat){
 
   std::stringstream ss;
 
+  //ci::Quatf r = mat.subMatrix33(0, 0);
+  //ci::Vec4f trans = mat.getTranslate();
+
+  //ss << trans.x << " " << trans.y << " " << trans.z << " " << r.w << " " << r.v.x << " " << r.v.y << " " << r.v.z << " ";
+
+  //return ss.str();
+
   for (int r = 0; r < 4; ++r){
     ss << "| ";
     for (int c = 0; c < 4; ++c){
@@ -345,6 +352,19 @@ ci::Matrix44f DHDaVinciPoseGrabber::GetPose(){
       psm.jnt_pos[i] = arm_joints_[i] + arm_offsets_[i];
     }
 
+    static float psm_head_pos = 0.0f;
+    static float psm_clasper_pos = 0.0f;
+
+    if (psm_head_pos != psm.jnt_pos[5]){
+      psm_head_pos = psm.jnt_pos[5];
+      ci::app::console() << "Head pos = " << psm_head_pos << std::endl;
+    }
+
+    if (psm_clasper_pos != psm.jnt_pos[6]){
+      psm_clasper_pos = psm.jnt_pos[6];
+      ci::app::console() << "Clasper pos = " << psm_clasper_pos << std::endl;
+    }
+
     if (target_joint_ == davinci::PSM1)
       buildKinematicChainPSM1(chain_, psm, model_.Shaft().transform_, model_.Head().transform_, model_.Clasper1().transform_, model_.Clasper2().transform_);
     else if (target_joint_ == davinci::PSM2)
@@ -472,6 +492,11 @@ void DHDaVinciPoseGrabber::WritePoseToStream(const ci::Matrix44f &camera_pose)  
   if (!arm_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
   if (!base_ofs_.is_open()) throw(std::runtime_error("Error, could not open file"));
 
+  //se3_ofs_ << WriteSE3ToString(camera_pose.inverted() * model_.Shaft().transform_);
+  //for (size_t i = 4; i < arm_joints_.size(); ++i){
+  //  se3_ofs_ << arm_joints_[i] + arm_offsets_[i] << " ";
+  //}
+  //se3_ofs_ << "\n" << std::endl;
   se3_ofs_ << WriteSE3ToString(camera_pose.inverted() * model_.Shaft().transform_) << "\n";
   for (size_t i = 4; i < arm_joints_.size(); ++i){
     se3_ofs_ << arm_joints_[i] + arm_offsets_[i] << "\n";
@@ -585,7 +610,7 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
   if (!ifs_.is_open()) throw std::runtime_error("Could not open file!\n");
   ofs_file_ = output_dir + "/" + reader.get_element("output-pose-file");
 
-  num_wrist_joints_ = 3; //should this load from config file?
+  num_wrist_joints_ = 4; //should this load from config file?
 
   wrist_dh_params_ = std::vector<double>(num_wrist_joints_, 0.0);
   wrist_offsets_ = std::vector<float>(num_wrist_joints_, 0.0);
@@ -596,6 +621,10 @@ SE3DaVinciPoseGrabber::SE3DaVinciPoseGrabber(const ConfigReader &reader, const s
   catch (std::runtime_error &){
 
   }
+
+  entire_x_rotation_offset_ = 0.0f;
+  entire_y_rotation_offset_ = 0.0f;
+  entire_z_rotation_offset_ = 0.0f;
 
 }
 
@@ -725,7 +754,8 @@ void SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
     std::string line;
     int row = 0;
 
-    ci::Vec3f articulation;
+    ci::Vec4f articulation;
+    //ci::Vec3f articulation;
     //remember - also set psmatend rotation angle for tip to +- val rather than +- 0.5*val. aslo skipping frist 59 frames.
 
 
@@ -737,10 +767,10 @@ void SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
       ifs_ >> rotation_[i];
     }
 
-    for (int i = 0; i < 3; ++i){
+    for (int i = 0; i < 4; ++i){
       ifs_ >> articulation[i];
     }
-    for (int i = 0; i < 3; ++i){
+    for (int i = 0; i < 4; ++i){
       wrist_dh_params_[i] = articulation[i];
     }
 
@@ -759,8 +789,7 @@ void SE3DaVinciPoseGrabber::LoadPoseAsQuaternion(){
     //rotation_ = qqnew;
 
     ci::Matrix44f rotation_m = rotation_;
-    shaft_pose_ = rotation_m; *current_user_supplied_offset_;
-
+    shaft_pose_ = rotation_m;  *current_user_supplied_offset_;
 
   }
   catch (std::ifstream::failure e){
@@ -874,16 +903,16 @@ bool SE3DaVinciPoseGrabber::LoadPose(const bool update_as_new){
   }
 
   
-  auto offset = MatrixFromIntrinsicEulers(x_rotation_offset_ - entire_x_rotation_offset_, y_rotation_offset_ - entire_y_rotation_offset_, z_rotation_offset_ - entire_z_rotation_offset_);
+  //auto offset = MatrixFromIntrinsicEulers(x_rotation_offset_ - entire_x_rotation_offset_, y_rotation_offset_ - entire_y_rotation_offset_, z_rotation_offset_ - entire_z_rotation_offset_);
 
-  entire_x_rotation_offset_ = x_rotation_offset_;
-  entire_y_rotation_offset_ = y_rotation_offset_;
-  entire_z_rotation_offset_ = z_rotation_offset_;
+  //entire_x_rotation_offset_ = x_rotation_offset_;
+  //entire_y_rotation_offset_ = y_rotation_offset_;
+  //entire_z_rotation_offset_ = z_rotation_offset_;
 
-  current_user_supplied_offset_ = current_user_supplied_offset_ * offset;
-  shaft_pose_ = shaft_pose_ * offset;
+  //current_user_supplied_offset_ = current_user_supplied_offset_ * offset;
+  ////shaft_pose_ = shaft_pose_ * offset;
   
-  shaft_pose_.setTranslate(translation_ + ci::Vec3f(x_translation_offset_, y_translation_offset_, z_translation_offset_));
+  shaft_pose_.setTranslate(translation_);// +ci::Vec3f(x_translation_offset_, y_translation_offset_, z_translation_offset_));
   do_draw_ = true;
 
   // update the list of previous poses for plotting trajectories.

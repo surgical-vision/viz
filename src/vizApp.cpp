@@ -756,8 +756,13 @@ void vizApp::drawCamera(gl::Texture &left_image_data, gl::Texture &right_image_d
 
   ci::Vec3f vertex[8];
 
+  ci::Vec3f line_color[8];
+  for (int i = 0; i < 8; ++i){ line_color[i] = ci::Vec3f(0.0, 0.0, 0.0); }
+
+  glEnableClientState(GL_COLOR_ARRAY);
   glEnableClientState(GL_VERTEX_ARRAY);
   glVertexPointer(3, GL_FLOAT, 0, &vertex[0].x);
+  glColorPointer(8, GL_FLOAT, 0, &line_color[0].x);
 
   vertex[0] = left_cam_center;
   vertex[1] = left_cam_bottom_left;
@@ -796,7 +801,8 @@ void vizApp::drawCamera(gl::Texture &left_image_data, gl::Texture &right_image_d
 
   glLineWidth(1.0f);
   glDisableClientState(GL_VERTEX_ARRAY);
-  
+  glDisableClientState(GL_COLOR_ARRAY);
+
 }
 
 void vizApp::drawCameraTracker(){
@@ -834,13 +840,17 @@ void vizApp::drawScene(gl::Texture &left_image, gl::Texture &right_image){
   
   if (!running_) return;
 
-  gl::clear(Color(0.15, 0.15, 0.15));
+  gl::clear(Color(1, 1, 1));
 
   if (trackables_.size() == 0) return;
   
   if (reset_viz_port_){
 
-    ci::Vec3f eye_point = trackables_[0]->GetPose().getTranslate().xyz() + ci::Vec3f(77.7396, -69.9107, -150.47f);
+     
+    ci::Vec3f init_translation(-24.3036, -16.4416, -113.097);
+
+    ci::Vec3f eye_point = init_translation;
+    if (moveable_camera_) eye_point += moveable_camera_->GetPose().getTranslate().xyz();
 
     ci::CameraPersp maya;
     maya.setEyePoint(eye_point);
@@ -853,7 +863,6 @@ void vizApp::drawScene(gl::Texture &left_image, gl::Texture &right_image){
   gl::pushMatrices();
   gl::setMatrices(maya_cam_2_.getCamera());
   
-
   ci::Area viewport = gl::getViewport();
   gl::setViewport(ci::Area(0, 0, framebuffer_3d_.getWidth(), framebuffer_3d_.getHeight()));
 
@@ -981,25 +990,7 @@ inline ci::Vec3f GetIntrinsicEulers(const ci::Matrix33f &m){
 
 void vizApp::drawTargets(){
 
-  static ci::Matrix44f m;
-  
   for (size_t i = 0; i < trackables_.size(); ++i){
-
-    //if (m != trackables_[i]->GetPose()){
-
-    //  //ci::app::console() << "Pose = \n" << moveable_camera_->GetPose().inverted() * trackables_[i]->GetPose();
-    m = trackables_[i]->GetPose();
-
-    ci::Matrix33f m33 = m.subMatrix33(0, 0);
-    ci::Quatf q = m33;
-    ci::app::console() << "Pitch = " << q.getPitch() << std::endl;
-    ci::app::console() << "Roll = " << q.getRoll() << std::endl;
-    ci::app::console() << "Yaw = " << q.getYaw() << std::endl;
-
-    q = ci::Quatf(q.getPitch(), q.getYaw(), q.getRoll());
-
-
-    //}
 
     trackables_[i]->Draw();
 
@@ -1077,15 +1068,15 @@ void vizApp::loadTrackable(const std::string &filepath, const std::string &outpu
   ConfigReader reader(filepath);
 
   try{
-    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
+    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new SE3DaVinciPoseGrabber(reader, output_dir)));
     return;
   }
   catch (std::runtime_error){
-  
+
   }
 
   try{
-    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new SE3DaVinciPoseGrabber(reader, output_dir)));
+    trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new DHDaVinciPoseGrabber(reader, output_dir)));
     return;
   }
   catch (std::runtime_error){
@@ -1099,6 +1090,8 @@ void vizApp::loadTrackable(const std::string &filepath, const std::string &outpu
   catch (std::runtime_error){
 
   }
+
+
   try{
     trackables_.push_back(boost::shared_ptr<BasePoseGrabber>(new PoseGrabber(reader, output_dir)));
     return;
